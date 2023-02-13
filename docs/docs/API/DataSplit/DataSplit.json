@@ -1,0 +1,12 @@
+{
+  "items": [
+    "DataSplit/custom_dataset",
+    "DataSplit/data_split",
+    "DataSplit/dataset_downloader",
+    "DataSplit/generate_dataset",
+    "DataSplit/split_types",
+    "DataSplit/storage_manager"
+  ],
+  "label": "DataSplit",
+  "type": "category"
+}

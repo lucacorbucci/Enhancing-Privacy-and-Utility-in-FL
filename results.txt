@@ -1,0 +1,16 @@
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]
+Experiment with 1 clusters,                     5 nodes,                     [0]                        P2P steps,                        1                        server steps
+[0.1, 0.2, 0.3, 0.4]

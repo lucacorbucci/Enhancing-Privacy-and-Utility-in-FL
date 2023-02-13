@@ -1,0 +1,11 @@
+{
+  "items": [
+    "Models/celeba",
+    "Models/cifar",
+    "Models/fashion_mnist",
+    "Models/federated_model",
+    "Models/mnist"
+  ],
+  "label": "Models",
+  "type": "category"
+}
