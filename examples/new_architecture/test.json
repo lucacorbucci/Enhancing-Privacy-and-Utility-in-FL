@@ -10,15 +10,13 @@
         "split_type": "stratified",
         "num_classes": 10,
         "num_nodes": 1,
-        "num_clusters": 4,
-        "max_samples_per_cluster": 10,
+        "num_clusters": 1000,
         "noniid_nodes_distribution": false,
-        "num_classes_per_cluster": 10,
+        "num_classes_per_cluster": 1000,
         "server_validation_set": "server_validation_split"
     },
-    
     "server_config": {
-        "differential_privacy_server": false,
+        "differential_privacy_server": true,
         "mixed_mode": false,
         "local_training_epochs_with_server": 1,
         "num_communication_round_with_server": 5,
@@ -31,6 +29,8 @@
         "lr": 0.001,
         "MAX_PHYSICAL_BATCH_SIZE": 128,
         "DELTA": 1e-5,
+        "noise_multiplier": 0.5,
+        "max_grad_norm": 1.2,
         "weight_decay": 0,
         "min_improvement": 0.001,
         "patience": 10,
@@ -38,6 +38,6 @@
     },
     "gpu_config": [
         "cuda:0",
-        "cuda:1"
+        "cuda:0"
     ]
 }

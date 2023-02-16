@@ -341,10 +341,11 @@ class FederatedNode:
         ]
 
         # Initialize differential privacy if needed
-        if differential_private_train:
-            self.federated_model.init_differential_privacy(phase=Phase.SERVER)
-            logger.debug(f"Node {self.node_id} initialized differential privacy")
-        logger.debug(f"Node {self.node_id} started, {self.federated_model}")
+        # if differential_private_train:
+        #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
+        #     logger.debug(f"Node {self.node_id} initialized differential privacy")
+        logger.debug(f"Node {self.node_id} started")
+        
 
         # (loss_list, accuracy_list, epsilon_list) = self.start_server_phase(
         #     federated_model,
@@ -376,6 +377,7 @@ class FederatedNode:
         -------
             Tuple[List[float], List[float], List[float]]: _description_
         """
+        logger.debug(f"Starting training on node {self.node_id}")
         loss_list: list[float] = []
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
@@ -386,8 +388,6 @@ class FederatedNode:
         differential_private_train = self.preferences.server_config[
             "differential_privacy_server"
         ]
-
-        logger.debug(f"FEDERATED_MODEL: {self.federated_model}")
 
         # We share the updates with the server for global_epochs times
         for _ in range(local_epochs):

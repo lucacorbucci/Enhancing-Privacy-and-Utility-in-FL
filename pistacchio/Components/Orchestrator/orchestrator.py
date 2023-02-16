@@ -1,20 +1,25 @@
 import copy
 import sys
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any
-
+import time
 import dill
 import torch
 from loguru import logger
 from torch import nn
+from concurrent.futures import wait
+from multiprocess.pool import ThreadPool
+from pistacchio.Utils.phases import Phase
+import random
+import multiprocess
+# import torch.multiprocessing 
 
 from pistacchio.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio.Models.federated_model import FederatedModel
 from pistacchio.Utils.phases import Phase
 from pistacchio.Utils.preferences import Preferences
 from pistacchio.Utils.utils import Utils
-
+import gc
 
 logger.remove()
 logger.add(
@@ -24,9 +29,12 @@ logger.add(
 )
 
 
-def start_nodes(node, model):
-    node.start_node(model)
-    return node
+def start_nodes(node, model, communication_queue):
+    new_node = copy.deepcopy(node)
+    new_node.federated_model = new_node.init_federated_model(model)
+    
+    communication_queue.put(new_node)
+    return "OK"
 
 
 def start_train(node):
@@ -48,8 +56,9 @@ class Orchestrator:
             preferences.data_split_config["num_nodes"]
             * preferences.data_split_config["num_clusters"]
         )
-        self.pool_size = 4
-        self.iterations = 3
+        self.pool_size = 25
+        self.iterations = 2
+        self.sampled_nodes = 100
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
@@ -78,34 +87,71 @@ class Orchestrator:
 
         logger.debug("Starting nodes...")
         model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
+        manager = multiprocess.Manager()
+        communication_queue = manager.Queue()
 
-        with ProcessPoolExecutor(self.pool_size) as executor:
+        with multiprocess.Pool(self.pool_size) as pool:
             results = [
-                executor.submit(start_nodes, node, model)
+                pool.apply_async(start_nodes, (node, model, communication_queue))
                 for node, model in zip(self.nodes, model_list)
             ]
             self.nodes = []
             for result in results:
-                self.nodes.append(result.result())
-
+                _ = result.get()
+                self.nodes.append(communication_queue.get())
+        
+        for node in self.nodes:
+            node.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=node.node_id)
         logger.debug("Nodes started")
 
+    
     def orchestrate_nodes(
         self,
     ) -> None:
         logger.debug("Orchestrating nodes...")
-        model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
 
-        for iteration_number in range(self.iterations):
-            weights = {}
-            with ThreadPoolExecutor(self.pool_size) as executor:
-                results = [executor.submit(start_train, node) for node in self.nodes]
+
+        with ThreadPool(self.pool_size) as pool:
+
+            for iteration in range(self.iterations):
+                logger.info(f"Iterazione {iteration}")
+                weights = {}
+                sampled_nodes = random.sample(self.nodes, self.sampled_nodes)
+                results = [pool.apply_async(start_train, (node,)) for node in sampled_nodes]
+
+                ready = []
+
+                # while True:
+                #     import time
+                #     time.sleep(1)
+                #     # catch exception if results are not ready yet
+                #     try:
+                #         ready = [result.ready() for result in results]
+                #         successful = [result.successful() for result in results]
+                #     except Exception:
+                #         continue
+                #     # exit loop if all tasks returned success
+                #     if all(successful):
+                #         break
+                #     # raise exception reporting exceptions received from workers
+                #     if all(ready) and not all(successful):
+                #         raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')
+
+                count = 0
                 for result in results:
-                    node_id, model_weights = result.result()
-                    weights[node_id] = model_weights.weights
+                    logger.debug(f"Popping {count}")
+                    count += 1
+                    node_id, model_weights = result.get()
 
-                Utils.compute_average(weights)
-            self.compute_metrics()
+                    weights[node_id] = copy.deepcopy(model_weights.weights)
+
+
+                avg = Utils.compute_average(weights)
+                for node in self.nodes:
+                    node.federated_model.update_weights(avg)
+
+                logger.debug("Computed the average")
+                self.compute_metrics()
         logger.debug("Training finished")
 
     def compute_metrics(self) -> None:
@@ -125,19 +171,21 @@ class Orchestrator:
         we'll use on the server for the validation.
         """
         logger.debug("Creating model")
+        orchestrator_model = copy.deepcopy(self.model)
         model = FederatedModel(
             dataset_name=self.preferences.dataset_name,
             node_name="server",
             preferences=self.preferences,
         )
         if model:
-            model.init_model(net=self.model)
+            model.init_model(net=orchestrator_model)
             model.trainloader = self.validation_set
             model.testloader = self.validation_set
 
             if self.preferences.server_config["differential_privacy_server"]:
                 model.net, _, _ = model.init_differential_privacy(
                     phase=Phase.SERVER,
+                    node_id="Orchestrator"
                 )
 
         logger.debug("Model created")
@@ -158,7 +206,7 @@ class Orchestrator:
             data,
             batch_size=16,
             shuffle=False,
-            num_workers=8,
+            num_workers=0,
         )
 
         if self.preferences.debug:

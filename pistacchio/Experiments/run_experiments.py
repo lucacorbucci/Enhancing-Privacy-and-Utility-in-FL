@@ -8,7 +8,7 @@ from pistacchio.Models.fashion_mnist import FashionMnistNet
 from pistacchio.Models.mnist import MnistNet
 from pistacchio.Utils.preferences import Preferences
 from pistacchio.Utils.task import Task, TaskType
-
+from multiprocessing import set_start_method
 
 class Experiment:
     # @staticmethod
@@ -404,8 +404,8 @@ class Experiment:
         """
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-        # set_start_method("spawn")
+        set_start_method("spawn")
+        torch.multiprocessing.set_sharing_strategy('file_system')
 
         preferences = Preferences.generate_from_json(config)
         if preferences.task.task_type == TaskType.FEDERATEDLEARNING:

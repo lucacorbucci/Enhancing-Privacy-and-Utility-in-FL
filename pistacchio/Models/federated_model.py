@@ -12,7 +12,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from torch import nn, optim
-
+import gc
 from pistacchio.Exceptions.errors import (
     InvalidDatasetError,
     NotYetInitializedFederatedLearningError,
@@ -87,6 +87,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             self.device = torch.device(
                 gpu_name if torch.cuda.is_available() and gpus else "cpu",
             )
+            logger.debug(f"Running on {self.device}")
 
         self.net = None
 
@@ -124,7 +125,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         self.net = model
         if not ModuleValidator.is_valid(model):
             model = ModuleValidator.fix(model)
-        self.net = model.to(self.device)
+        
 
     def load_data(
         self,
@@ -143,16 +144,16 @@ class FederatedModel(ABC, Generic[TDestination]):
             batch_size = self.preferences.hyperparameters["batch_size"]
             trainloader = torch.utils.data.DataLoader(
                 self.training_set,
-                batch_size=batch_size,
+                batch_size=16,
                 shuffle=True,
-                num_workers=8,
+                num_workers=0,
             )
 
             testloader = torch.utils.data.DataLoader(
                 self.test_set,
-                batch_size=batch_size,
+                batch_size=16,
                 shuffle=False,
-                num_workers=8,
+                num_workers=0,
             )
 
             if self.preferences and self.preferences.debug:
@@ -256,6 +257,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             running_loss = 0.0
             total_correct = 0
             total = 0
+            self.net = self.net.to(self.device)
 
             self.net.train()
 
@@ -264,9 +266,19 @@ class FederatedModel(ABC, Generic[TDestination]):
 
                 if isinstance(data, list):
                     data = data[0]
+
+
+                # if torch.cuda.is_available():
+                #     gc.collect()
+                #     torch.cuda.empty_cache()
+                #     with torch.no_grad():
+                #         torch.cuda.empty_cache()
+
+
                 target = target.to(self.device)
                 data = data.to(self.device)
 
+                
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
                 loss = criterion(outputs, target)
@@ -280,7 +292,15 @@ class FederatedModel(ABC, Generic[TDestination]):
                 total += target.size(0)
 
                 if torch.cuda.is_available():
+                    # del data
+                    # del target
+                    # del loss
+                    gc.collect()
                     torch.cuda.empty_cache()
+                    with torch.no_grad():
+                        torch.cuda.empty_cache()
+
+
 
             loss = running_loss / len(self.trainloader)
             accuracy = total_correct / total
@@ -309,6 +329,9 @@ class FederatedModel(ABC, Generic[TDestination]):
             running_loss = 0.0
             total_correct = 0
             total = 0
+
+            self.net = self.net.to(self.device)
+
             self.net.train()
 
             with BatchMemoryManager(
@@ -454,7 +477,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         else:
             raise NotYetInitializedPreferencesError
 
-    def init_privacy_with_noise(self, phase: Phase) -> None:
+    def init_privacy_with_noise(self, phase: Phase, node_id) -> None:
         """Initialize differential privacy using the noise parameter
         without the epsilon parameter.
         Noise multiplier: the more is higher the more is the noise
@@ -490,6 +513,7 @@ class FederatedModel(ABC, Generic[TDestination]):
     def init_differential_privacy(
         self,
         phase: Phase,
+        node_id
     ) -> tuple[nn.Module, optim.Optimizer, torch.utils.data.DataLoader]:
         """Initialize the differential privacy.
 
@@ -511,7 +535,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             if epsilon:
                 self.init_privacy_with_epsilon(phase=phase, epsilon=epsilon)
             else:
-                self.init_privacy_with_noise(phase=phase)
+                self.init_privacy_with_noise(phase=phase, node_id=node_id)
 
             return self.net, self.optimizer, self.trainloader
         raise NotYetInitializedPreferencesError

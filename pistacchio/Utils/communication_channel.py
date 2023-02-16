@@ -28,5 +28,4 @@ class CommunicationChannel:
         Args:
             data (_type_): the data we want to send
         """
-        print("OK")
         self.channel.put(data)
