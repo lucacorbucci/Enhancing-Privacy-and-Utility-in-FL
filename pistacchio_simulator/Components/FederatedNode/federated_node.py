@@ -60,24 +60,24 @@ class FederatedNode:
         # self.server_channel: CommunicationChannel | None = None
         self.federated_model = None
 
-    def receive_data_from_server(self) -> Any:
-        """This function receives the weights from the server.
-        If the weights are not received, it returns an error message
-        otherwise it returns the weights.
+    # def receive_data_from_server(self) -> Any:
+    #     """This function receives the weights from the server.
+    #     If the weights are not received, it returns an error message
+    #     otherwise it returns the weights.
 
-        Returns
-        -------
-            Union[Weights, None]: Weights received from the server
-        """
-        try:
-            received_data = self.receiver_channel.receive_data()
-            return (
-                received_data
-                if received_data == Message.STOP
-                else received_data.weights
-            )
-        except (ValueError, AttributeError):
-            return Message.ERROR
+    #     Returns
+    #     -------
+    #         Union[Weights, None]: Weights received from the server
+    #     """
+    #     try:
+    #         received_data = self.receiver_channel.receive_data()
+    #         return (
+    #             received_data
+    #             if received_data == Message.STOP
+    #             else received_data.weights
+    #         )
+    #     except (ValueError, AttributeError):
+    #         return Message.ERROR
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -119,14 +119,14 @@ class FederatedNode:
 
         return federated_model
 
-    def get_communication_channel(self) -> CommunicationChannel:
-        """Getter for the communication channel of this node.
+    # def get_communication_channel(self) -> CommunicationChannel:
+    #     """Getter for the communication channel of this node.
 
-        Returns
-        -------
-            CommunicationChannel: _description_
-        """
-        return self.receiver_channel
+    #     Returns
+    #     -------
+    #         CommunicationChannel: _description_
+    #     """
+    #     return self.receiver_channel
 
     def local_training(
         self,
@@ -345,7 +345,6 @@ class FederatedNode:
         #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
         logger.debug(f"Node {self.node_id} started")
-        
 
         # (loss_list, accuracy_list, epsilon_list) = self.start_server_phase(
         #     federated_model,

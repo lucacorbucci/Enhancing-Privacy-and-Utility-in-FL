@@ -10,6 +10,7 @@ from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task, TaskType
 from multiprocessing import set_start_method
 
+
 class Experiment:
     # @staticmethod
     # def launch_server(server: Server) -> None:
@@ -405,7 +406,7 @@ class Experiment:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         set_start_method("spawn")
-        torch.multiprocessing.set_sharing_strategy('file_system')
+        torch.multiprocessing.set_sharing_strategy("file_system")
 
         preferences = Preferences.generate_from_json(config)
         if preferences.task.task_type == TaskType.FEDERATEDLEARNING:

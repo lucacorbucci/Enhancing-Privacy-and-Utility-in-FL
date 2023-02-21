@@ -31,7 +31,7 @@ logger.add(
 def start_nodes(node, model, communication_queue):
     new_node = copy.deepcopy(node)
     new_node.federated_model = new_node.init_federated_model(model)
-    
+
     communication_queue.put(new_node)
     return "OK"
 
@@ -98,17 +98,15 @@ class Orchestrator:
             for result in results:
                 _ = result.get()
                 self.nodes.append(communication_queue.get())
-        
+
         for node in self.nodes:
-            node.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=node.node_id)
+            node.federated_model.init_differential_privacy(phase=Phase.SERVER)
         logger.debug("Nodes started")
 
-    
     def orchestrate_nodes(
         self,
     ) -> None:
         logger.debug("Orchestrating nodes...")
-
 
         with ThreadPool(self.pool_size) as pool:
 
@@ -116,7 +114,9 @@ class Orchestrator:
                 logger.info(f"Iterazione {iteration}")
                 weights = {}
                 sampled_nodes = random.sample(self.nodes, self.sampled_nodes)
-                results = [pool.apply_async(start_train, (node,)) for node in sampled_nodes]
+                results = [
+                    pool.apply_async(start_train, (node,)) for node in sampled_nodes
+                ]
 
                 ready = []
 
@@ -143,7 +143,6 @@ class Orchestrator:
                     node_id, model_weights = result.get()
 
                     weights[node_id] = copy.deepcopy(model_weights.weights)
-
 
                 avg = Utils.compute_average(weights)
                 for node in self.nodes:
@@ -182,10 +181,7 @@ class Orchestrator:
             model.testloader = self.validation_set
 
             if self.preferences.server_config["differential_privacy_server"]:
-                model.net, _, _ = model.init_differential_privacy(
-                    phase=Phase.SERVER,
-                    node_id="Orchestrator"
-                )
+                model.net, _, _ = model.init_differential_privacy(phase=Phase.SERVER)
 
         logger.debug("Model created")
         return model
