@@ -119,6 +119,23 @@ class Orchestrator:
                 results = [pool.apply_async(start_train, (node,)) for node in sampled_nodes]
 
                 ready = []
+
+                # while True:
+                #     import time
+                #     time.sleep(1)
+                #     # catch exception if results are not ready yet
+                #     try:
+                #         ready = [result.ready() for result in results]
+                #         successful = [result.successful() for result in results]
+                #     except Exception:
+                #         continue
+                #     # exit loop if all tasks returned success
+                #     if all(successful):
+                #         break
+                #     # raise exception reporting exceptions received from workers
+                #     if all(ready) and not all(successful):
+                #         raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')
+
                 count = 0
                 for result in results:
                     logger.debug(f"Popping {count}")
