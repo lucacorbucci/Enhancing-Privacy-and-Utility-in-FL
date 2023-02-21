@@ -9,16 +9,15 @@ from loguru import logger
 from torch import nn
 from concurrent.futures import wait
 from multiprocess.pool import ThreadPool
-from pistacchio.Utils.phases import Phase
+from pistacchio_simulator.Utils.phases import Phase
 import random
 import multiprocess
-# import torch.multiprocessing 
 
-from pistacchio.Components.FederatedNode.federated_node import FederatedNode
-from pistacchio.Models.federated_model import FederatedModel
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.utils import Utils
+from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
+from pistacchio_simulator.Models.federated_model import FederatedModel
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.utils import Utils
 import gc
 
 logger.remove()
@@ -120,23 +119,6 @@ class Orchestrator:
                 results = [pool.apply_async(start_train, (node,)) for node in sampled_nodes]
 
                 ready = []
-
-                # while True:
-                #     import time
-                #     time.sleep(1)
-                #     # catch exception if results are not ready yet
-                #     try:
-                #         ready = [result.ready() for result in results]
-                #         successful = [result.successful() for result in results]
-                #     except Exception:
-                #         continue
-                #     # exit loop if all tasks returned success
-                #     if all(successful):
-                #         break
-                #     # raise exception reporting exceptions received from workers
-                #     if all(ready) and not all(successful):
-                #         raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')
-
                 count = 0
                 for result in results:
                     logger.debug(f"Popping {count}")

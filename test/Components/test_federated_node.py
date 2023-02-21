@@ -9,17 +9,17 @@ from torch import nn
 
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
-from pistacchio.Components.FederatedNode.federated_node import FederatedNode
-from pistacchio.DataSplit.custom_dataset import MyDataset
-from pistacchio.DataSplit.data_split import DataSplit
-from pistacchio.DataSplit.storage_manager import StorageManager
-from pistacchio.Exceptions.errors import NotYetInitializedServerChannelError
-from pistacchio.Utils.communication_channel import CommunicationChannel
-from pistacchio.Utils.end_messages import Message
-from pistacchio.Utils.performances import Performances
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.task import Task
-from pistacchio.Utils.weights import Weights
+from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
+from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
+from pistacchio_simulator.DataSplit.data_split import DataSplit
+from pistacchio_simulator.DataSplit.storage_manager import StorageManager
+from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
+from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
+from pistacchio_simulator.Utils.end_messages import Message
+from pistacchio_simulator.Utils.performances import Performances
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.task import Task
+from pistacchio_simulator.Utils.weights import Weights
 
 
 preferences = Preferences(

@@ -13,15 +13,15 @@ TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 
-from pistacchio.DataSplit.custom_dataset import MyDataset
-from pistacchio.DataSplit.data_split import DataSplit
-from pistacchio.DataSplit.storage_manager import StorageManager
-from pistacchio.Models.federated_model import FederatedModel
-from pistacchio.Models.mnist import MnistNet
-from pistacchio.Utils.data_loader import DataLoader
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.task import Task
+from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
+from pistacchio_simulator.DataSplit.data_split import DataSplit
+from pistacchio_simulator.DataSplit.storage_manager import StorageManager
+from pistacchio_simulator.Models.federated_model import FederatedModel
+from pistacchio_simulator.Models.mnist import MnistNet
+from pistacchio_simulator.Utils.data_loader import DataLoader
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.task import Task
 
 
 preferences_mnist = Preferences(

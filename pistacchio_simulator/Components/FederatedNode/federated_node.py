@@ -5,14 +5,14 @@ from typing import Any, Mapping, TypeVar
 from loguru import logger
 from torch import Tensor, nn
 
-from pistacchio.Exceptions.errors import NotYetInitializedServerChannelError
-from pistacchio.Models.federated_model import FederatedModel
-from pistacchio.Utils.communication_channel import CommunicationChannel
-from pistacchio.Utils.end_messages import Message
-from pistacchio.Utils.performances import Performances
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.weights import Weights
+from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
+from pistacchio_simulator.Models.federated_model import FederatedModel
+from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
+from pistacchio_simulator.Utils.end_messages import Message
+from pistacchio_simulator.Utils.performances import Performances
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.weights import Weights
 
 
 logger.remove()

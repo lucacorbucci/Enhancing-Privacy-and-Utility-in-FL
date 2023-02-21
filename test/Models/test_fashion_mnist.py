@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
-from pistacchio.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
 
 
 class TestFashionMnistNet:

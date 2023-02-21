@@ -4,7 +4,7 @@ import sys
 import torch
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
-from pistacchio.Models.celeba import CelebaGenderNet, CelebaNet
+from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
 
 
 class TestCelebaNet:

@@ -13,14 +13,14 @@ from opacus.validators import ModuleValidator
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from torch import nn, optim
 import gc
-from pistacchio.Exceptions.errors import (
+from pistacchio_simulator.Exceptions.errors import (
     InvalidDatasetError,
     NotYetInitializedFederatedLearningError,
     NotYetInitializedPreferencesError,
 )
-from pistacchio.Utils.data_loader import DataLoader
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.data_loader import DataLoader
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 warnings.filterwarnings("ignore")

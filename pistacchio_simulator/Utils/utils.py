@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from torch import Tensor
 
 import wandb
-from pistacchio.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])

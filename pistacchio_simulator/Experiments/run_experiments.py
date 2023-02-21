@@ -1,13 +1,13 @@
 import torch
 from torch import nn
 
-from pistacchio.Components.Orchestrator.orchestrator import Orchestrator
-from pistacchio.Exceptions.errors import InvalidDatasetErrorNameError
-from pistacchio.Models.celeba import CelebaGenderNet, CelebaNet
-from pistacchio.Models.fashion_mnist import FashionMnistNet
-from pistacchio.Models.mnist import MnistNet
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.task import Task, TaskType
+from pistacchio_simulator.Components.Orchestrator.orchestrator import Orchestrator
+from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
+from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
+from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.mnist import MnistNet
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.task import Task, TaskType
 from multiprocessing import set_start_method
 
 class Experiment:

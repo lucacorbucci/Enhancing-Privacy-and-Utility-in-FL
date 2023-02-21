@@ -9,11 +9,11 @@ from collections import Counter
 
 from loguru import logger
 
-from pistacchio.DataSplit.data_split import DataSplit
-from pistacchio.DataSplit.dataset_downloader import DatasetDownloader
-from pistacchio.DataSplit.storage_manager import StorageManager
-from pistacchio.Exceptions.errors import InvalidSplitTypeError
-from pistacchio.Utils.preferences import Preferences
+from pistacchio_simulator.DataSplit.data_split import DataSplit
+from pistacchio_simulator.DataSplit.dataset_downloader import DatasetDownloader
+from pistacchio_simulator.DataSplit.storage_manager import StorageManager
+from pistacchio_simulator.Exceptions.errors import InvalidSplitTypeError
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 def print_debug(counters: Counter) -> None:
