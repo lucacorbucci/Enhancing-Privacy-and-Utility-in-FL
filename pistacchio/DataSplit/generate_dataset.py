@@ -427,10 +427,22 @@ def generate_splitted_dataset(config: Preferences, custom_dataset: dict = None) 
         )
     else:
         raise InvalidSplitTypeError
+    
+    # type(cluster_datasets) -> <class 'list'>, a list containg datasets of clients
+    #   len(cluster_datasets) == clients.
+    
+    # type(cluster_datasets[500]) -> <class 'torch.utils.data.dataset.Subset'>, dataset of client i
+    #   len(cluster_datasets[500]) == len(dataset) / clients
+    
+    # type(cluster_datasets[500][0]) -> <class 'tuple'>
+    #   len(cluster_datasets[500][0]) == 2
+    
+    # type(cluster_datasets[500][0])) -> <class 'torch.Tensor'>
+    #   cluster_datasets[500][0].shape == torch.Size([x, y, z])
+    # type(cluster_datasets[500][1])) == <class 'int'>, label of the target
 
     print_debug(counters)
     print_debug(counters_test)
-
     store_on_disk(config, cluster_datasets, cluster_datasets_test, test_ds, names)
 
 
