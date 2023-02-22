@@ -437,14 +437,13 @@ def generate_splitted_dataset(config: Preferences, custom_dataset: dict = None) 
     # type(cluster_datasets[500][0]) -> <class 'tuple'>
     #   len(cluster_datasets[500][0]) == 2
     
-    # type(cluster_datasets[500][0])) -> <class 'torch.Tensor'>
-    #   cluster_datasets[500][0].shape == torch.Size([x, y, z])
-    # type(cluster_datasets[500][1])) == <class 'int'>, label of the target
+    # type(cluster_datasets[500][0][0])) -> <class 'torch.Tensor'>
+    #   cluster_datasets[500][0][0].shape == torch.Size([x, y, z])
+    # type(cluster_datasets[500][0][1])) == <class 'int'>, label of the target
 
     print_debug(counters)
     print_debug(counters_test)
     store_on_disk(config, cluster_datasets, cluster_datasets_test, test_ds, names)
-
 
 def main() -> None:
     """Based on the preferences, this function generates the dataset.
