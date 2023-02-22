@@ -1,7 +1,7 @@
 import time
 
-from pistacchio.Exceptions.errors import MissingConfigurationError
-from pistacchio.Utils.task import Task
+from pistacchio_simulator.Exceptions.errors import MissingConfigurationError
+from pistacchio_simulator.Utils.task import Task
 
 
 class Preferences:

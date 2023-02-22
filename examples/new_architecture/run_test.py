@@ -4,7 +4,7 @@ import sys
 
 from loguru import logger
 
-from pistacchio.Experiments.run_experiments import Experiment
+from pistacchio_simulator.Experiments.run_experiments import Experiment
 
 
 def main() -> None:

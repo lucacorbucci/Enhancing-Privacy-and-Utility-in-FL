@@ -9,7 +9,7 @@ from torchvision import transforms
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 
-from pistacchio.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
+from pistacchio_simulator.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
 
 
 class TestMyDataset:

@@ -13,14 +13,14 @@ from opacus.validators import ModuleValidator
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from torch import nn, optim
 import gc
-from pistacchio.Exceptions.errors import (
+from pistacchio_simulator.Exceptions.errors import (
     InvalidDatasetError,
     NotYetInitializedFederatedLearningError,
     NotYetInitializedPreferencesError,
 )
-from pistacchio.Utils.data_loader import DataLoader
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.data_loader import DataLoader
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 warnings.filterwarnings("ignore")
@@ -125,7 +125,6 @@ class FederatedModel(ABC, Generic[TDestination]):
         self.net = model
         if not ModuleValidator.is_valid(model):
             model = ModuleValidator.fix(model)
-        
 
     def load_data(
         self,
@@ -267,18 +266,15 @@ class FederatedModel(ABC, Generic[TDestination]):
                 if isinstance(data, list):
                     data = data[0]
 
-
                 # if torch.cuda.is_available():
                 #     gc.collect()
                 #     torch.cuda.empty_cache()
                 #     with torch.no_grad():
                 #         torch.cuda.empty_cache()
 
-
                 target = target.to(self.device)
                 data = data.to(self.device)
 
-                
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
                 loss = criterion(outputs, target)
@@ -299,8 +295,6 @@ class FederatedModel(ABC, Generic[TDestination]):
                     torch.cuda.empty_cache()
                     with torch.no_grad():
                         torch.cuda.empty_cache()
-
-
 
             loss = running_loss / len(self.trainloader)
             accuracy = total_correct / total
@@ -477,7 +471,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         else:
             raise NotYetInitializedPreferencesError
 
-    def init_privacy_with_noise(self, phase: Phase, node_id) -> None:
+    def init_privacy_with_noise(self, phase: Phase) -> None:
         """Initialize differential privacy using the noise parameter
         without the epsilon parameter.
         Noise multiplier: the more is higher the more is the noise
@@ -511,9 +505,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             raise NotYetInitializedPreferencesError
 
     def init_differential_privacy(
-        self,
-        phase: Phase,
-        node_id
+        self, phase: Phase
     ) -> tuple[nn.Module, optim.Optimizer, torch.utils.data.DataLoader]:
         """Initialize the differential privacy.
 
@@ -535,7 +527,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             if epsilon:
                 self.init_privacy_with_epsilon(phase=phase, epsilon=epsilon)
             else:
-                self.init_privacy_with_noise(phase=phase, node_id=node_id)
+                self.init_privacy_with_noise(phase=phase)
 
             return self.net, self.optimizer, self.trainloader
         raise NotYetInitializedPreferencesError

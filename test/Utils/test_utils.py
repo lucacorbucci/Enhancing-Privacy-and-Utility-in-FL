@@ -7,8 +7,8 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.utils import Utils
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.utils import Utils
 
 preferences = Preferences(
     dataset_name="mnist",

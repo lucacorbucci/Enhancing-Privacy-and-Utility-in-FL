@@ -4,7 +4,7 @@ from time import perf_counter, sleep
 
 from multiprocess import Manager, Process, Queue
 
-from pistacchio.Components.federated_node import FederatedNode
+from pistacchio_simulator.Components.federated_node import FederatedNode
 
 
 class Node:

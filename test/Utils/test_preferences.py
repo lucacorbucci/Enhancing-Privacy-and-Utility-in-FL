@@ -2,8 +2,8 @@ import os
 import sys
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
-from pistacchio.Utils.preferences import Preferences
-from pistacchio.Utils.task import TaskType
+from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.Utils.task import TaskType
 
 preferences_mnist = {
     "dataset": "mnist",

@@ -1,8 +1,8 @@
 import argparse
 import json
 
-from pistacchio.DataSplit.generate_dataset import generate_splitted_dataset
-from pistacchio.Utils.preferences import Preferences
+from pistacchio_simulator.DataSplit.generate_dataset import generate_splitted_dataset
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 def main() -> None:

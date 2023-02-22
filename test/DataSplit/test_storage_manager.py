@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 parentdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pistacchio.DataSplit.storage_manager import StorageManager
+from pistacchio_simulator.DataSplit.storage_manager import StorageManager
 
 
 class TestStorageManager:

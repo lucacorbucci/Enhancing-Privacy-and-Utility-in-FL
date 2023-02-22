@@ -8,9 +8,9 @@ import numpy as np
 import torch
 from torch.utils.data import Subset
 
-from pistacchio.DataSplit.custom_dataset import MyDataset
-from pistacchio.Exceptions.errors import InvalidSplitConfigurationError
-from pistacchio.Utils.task import Task, TaskType
+from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
+from pistacchio_simulator.Exceptions.errors import InvalidSplitConfigurationError
+from pistacchio_simulator.Utils.task import Task, TaskType
 
 
 random.seed(42)

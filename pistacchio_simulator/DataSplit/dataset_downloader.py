@@ -3,9 +3,9 @@ import torch
 import torchvision
 from torchvision import datasets, transforms
 
-from pistacchio.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
-from pistacchio.Exceptions.errors import InvalidDatasetErrorNameError
-from pistacchio.Utils.utils import Utils
+from pistacchio_simulator.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
+from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
+from pistacchio_simulator.Utils.utils import Utils
 
 
 class DatasetDownloader:

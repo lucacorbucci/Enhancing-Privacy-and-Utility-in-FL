@@ -4,7 +4,7 @@ import sys
 import torch
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
-from pistacchio.Models.cifar import CifarNet
+from pistacchio_simulator.Models.cifar import CifarNet
 
 
 class TestCifarNet:

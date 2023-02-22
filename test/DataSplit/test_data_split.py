@@ -13,12 +13,12 @@ from torch.utils.data import DataLoader, Dataset, Subset, TensorDataset
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 
-from pistacchio.DataSplit.custom_dataset import MyDataset
-from pistacchio.DataSplit.data_split import DataSplit
-from pistacchio.DataSplit.dataset_downloader import DatasetDownloader
-from pistacchio.DataSplit.storage_manager import StorageManager
-from pistacchio.Exceptions.errors import InvalidSplitConfigurationError
-from pistacchio.Utils.task import Task
+from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
+from pistacchio_simulator.DataSplit.data_split import DataSplit
+from pistacchio_simulator.DataSplit.dataset_downloader import DatasetDownloader
+from pistacchio_simulator.DataSplit.storage_manager import StorageManager
+from pistacchio_simulator.Exceptions.errors import InvalidSplitConfigurationError
+from pistacchio_simulator.Utils.task import Task
 
 
 class NumbersDataset(Dataset):
