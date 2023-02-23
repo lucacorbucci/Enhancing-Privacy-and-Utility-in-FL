@@ -119,14 +119,7 @@ class FederatedNode:
 
         return federated_model
 
-    # def get_communication_channel(self) -> CommunicationChannel:
-    #     """Getter for the communication channel of this node.
-
-    #     Returns
-    #     -------
-    #         CommunicationChannel: _description_
-    #     """
-    #     return self.receiver_channel
+ 
 
     def local_training(
         self,
@@ -186,71 +179,7 @@ class FederatedNode:
 
         return received_weights
 
-    def start_server_phase(
-        self,
-        federated_model: FederatedModel,
-        results: dict | None = None,
-    ) -> tuple[list[float], list[float], list[float]]:
-        """This function starts the server phase of the federated learning.
-        In particular, it trains the model locally and then sends the weights.
-        Then the updated weights are received and used to update
-        the local model.
-
-        Args:
-            federated_model (FederatedModel): _description_
-
-        Returns
-        -------
-            Tuple[List[float], List[float], List[float]]: _description_
-        """
-        loss_list: list[float] = []
-        accuracy_list: list[float] = []
-        epsilon_list: list[float] = []
-
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
-        global_epochs = self.preferences.server_config[
-            "num_communication_round_with_server"
-        ]
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
-
-        # Initialize differential privacy if needed
-        if differential_private_train:
-            federated_model.init_differential_privacy(phase=Phase.SERVER)
-
-        # We share the updates with the server for global_epochs times
-        for _ in range(global_epochs):
-            # Train the model locally for local_epochs
-            # before sending an update to the server
-            for _ in range(local_epochs):
-                metrics = self.local_training(
-                    differential_private_train,
-                    federated_model,
-                )
-                loss_list.append(metrics["loss"])
-                accuracy_list.append(metrics["accuracy"])
-                if metrics.get("epsilon", None):
-                    epsilon_list.append(metrics["epsilon"])
-
-            received_weights = self.send_and_receive_weights_with_server(
-                federated_model=federated_model,
-                metrics=metrics,
-                results=results,
-            )
-
-            if received_weights == Message.STOP:
-                return loss_list, accuracy_list, epsilon_list
-            if received_weights == Message.ERROR:
-                break
-
-            # Update the weights of the model
-            federated_model.update_weights(received_weights)
-
-        return loss_list, accuracy_list, epsilon_list
-
+    
     def send_performances(self, performances: dict[str, Performances]) -> None:
         """This function is used to send the performances of
         the node to the server.
@@ -346,20 +275,7 @@ class FederatedNode:
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
         logger.debug(f"Node {self.node_id} started")
 
-        # (loss_list, accuracy_list, epsilon_list) = self.start_server_phase(
-        #     federated_model,
-        # )
-        # performances = self.compute_performances(
-        #     loss_list=loss_list,
-        #     accuracy_list=accuracy_list,
-        #     phase="server",
-        #     message_counter=self.message_counter,
-        #     epsilon_list=epsilon_list,
-        # )
-        # performances = {**performances}
-        # self.send_performances(performances)
-        # time.sleep(10)
-
+     
     def train_local_model(
         self,
         # results: dict | None = None,
@@ -388,7 +304,6 @@ class FederatedNode:
             "differential_privacy_server"
         ]
 
-        # We share the updates with the server for global_epochs times
         for _ in range(local_epochs):
             metrics = self.local_training(
                 differential_private_train,
@@ -397,6 +312,8 @@ class FederatedNode:
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
+        
+        logger.debug("2")
         return Weights(
             weights=self.federated_model.get_weights(),
             sender=self.node_id,

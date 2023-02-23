@@ -327,4 +327,3 @@ class Utils:
         zipped_list = list(zip(first_list, second_list))
         random.shuffle(zipped_list)
         return zip(*zipped_list)
-        return zip(*zipped_list)

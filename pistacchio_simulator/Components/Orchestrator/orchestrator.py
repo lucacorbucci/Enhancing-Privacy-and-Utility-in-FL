@@ -66,6 +66,10 @@ class Orchestrator:
         self.federated_model = self.create_model()
         self.nodes = self.create_nodes()
         self.start_nodes()
+
+        if self.preferences.server_config["differential_privacy_server"]:
+            for node in self.nodes:
+                node.federated_model.init_differential_privacy(phase=Phase.SERVER)
         
         # We want to be sure that the number of nodes that we 
         # sample at each iteration is always less or equal to the 
@@ -117,8 +121,6 @@ class Orchestrator:
                 _ = result.get()
                 self.nodes.append(communication_queue.get())
 
-        for node in self.nodes:
-            node.federated_model.init_differential_privacy(phase=Phase.SERVER)
         logger.debug("Nodes started")
 
     def orchestrate_nodes(
@@ -149,7 +151,8 @@ class Orchestrator:
                 avg = Utils.compute_average(weights)
                 for node in self.nodes:
                     node.federated_model.update_weights(avg)
-
+                self.federated_model.update_weights(avg)
+                
                 logger.debug("Computed the average")
                 self.log_metrics(iteration=iteration)
         logger.debug("Training finished")

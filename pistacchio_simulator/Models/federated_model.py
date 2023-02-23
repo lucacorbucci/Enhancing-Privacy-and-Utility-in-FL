@@ -259,42 +259,34 @@ class FederatedModel(ABC, Generic[TDestination]):
             self.net = self.net.to(self.device)
 
             self.net.train()
-
             for _, (data, target) in enumerate(self.trainloader, 0):
+
                 self.optimizer.zero_grad()
 
                 if isinstance(data, list):
                     data = data[0]
 
-                # if torch.cuda.is_available():
-                #     gc.collect()
-                #     torch.cuda.empty_cache()
-                #     with torch.no_grad():
-                #         torch.cuda.empty_cache()
-
-                target = target.to(self.device)
-                data = data.to(self.device)
-
+                data, target = data.to(self.device), target.to(self.device)
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
-                loss = criterion(outputs, target)
-                loss.backward()
-                self.optimizer.step()
-
                 _, predicted = torch.max(outputs.data, 1)
                 correct = (predicted == target).float().sum()
+
+                loss = criterion(outputs, target)
                 running_loss += loss.item()
                 total_correct += correct
                 total += target.size(0)
 
+                self.optimizer.zero_grad()
+                self.net.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                self.net.zero_grad()
+        
                 if torch.cuda.is_available():
-                    # del data
-                    # del target
-                    # del loss
-                    gc.collect()
                     torch.cuda.empty_cache()
-                    with torch.no_grad():
-                        torch.cuda.empty_cache()
+
 
             loss = running_loss / len(self.trainloader)
             accuracy = total_correct / total
