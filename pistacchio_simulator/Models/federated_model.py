@@ -397,8 +397,6 @@ class FederatedModel(ABC, Generic[TDestination]):
                         data, target = data.to(self.device), target.to(self.device)
                         output = self.net(data)
                         total += target.size(0)
-                        # test_loss += F.nll_loss(
-                        # ).item()  # sum up batch loss
                         test_loss = criterion(output, target).item()
                         losses.append(test_loss)
                         pred = output.argmax(dim=1, keepdim=True)
@@ -420,6 +418,29 @@ class FederatedModel(ABC, Generic[TDestination]):
                 cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
                 accuracy_per_class = cm.diagonal()
 
+                true_positives = np.diag(cm)
+                num_classes = len(list(set(y_true)))
+
+                false_positives = []
+                for i in range(num_classes):
+                    false_positives.append(sum(cm[:,i]) - cm[i,i])
+
+                false_negatives = []
+                for i in range(num_classes):
+                    false_negatives.append(sum(cm[i,:]) - cm[i,i])
+
+                true_negatives = []
+                for i in range(num_classes):
+                    temp = np.delete(cm, i, 0)   # delete ith row
+                    temp = np.delete(temp, i, 1)  # delete ith column
+                    true_negatives.append(sum(sum(temp)))
+
+                denominator = [sum(x) for x in zip(false_positives, true_negatives)]
+                false_positive_rate = [num/den for num, den in zip(false_positives, denominator)]
+
+                denominator = [sum(x) for x in zip(true_positives, false_negatives)]
+                true_positive_rate = [num/den for num, den in zip(true_positives, denominator)]
+
                 return (
                     test_loss,
                     accuracy,
@@ -427,6 +448,8 @@ class FederatedModel(ABC, Generic[TDestination]):
                     precision,
                     recall,
                     accuracy_per_class,
+                    true_positive_rate,
+                    false_positive_rate
                 )
 
             raise NotYetInitializedFederatedLearningError

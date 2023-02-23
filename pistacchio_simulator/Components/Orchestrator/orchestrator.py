@@ -46,6 +46,7 @@ class Orchestrator:
         self,
         preferences: Preferences,
         model: nn.Module,
+        iteration: int | None
     ) -> None:
         self.preferences = preferences
         self.model = model
@@ -55,17 +56,27 @@ class Orchestrator:
             preferences.data_split_config["num_nodes"]
             * preferences.data_split_config["num_clusters"]
         )
-        self.pool_size = 25
+        self.pool_size = 5
         self.iterations = 2
-        self.sampled_nodes = 100
+        self.sampled_nodes = 5
+        self.iteration = iteration
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
         self.federated_model = self.create_model()
-
         self.nodes = self.create_nodes()
         self.start_nodes()
+        
+        # We want to be sure that the number of nodes that we 
+        # sample at each iteration is always less or equal to the 
+        # total number of nodes.
+        self.sampled_nodes = min(self.sampled_nodes, len(self.nodes))
+        if self.preferences.wandb:
+            self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
         self.orchestrate_nodes()
+        if self.preferences.wandb:
+            Utils.finish_wandb(wandb_run=self.wandb)
+
 
     def create_nodes(
         self,
@@ -80,6 +91,13 @@ class Orchestrator:
                     preferences=self.preferences,
                 )
                 nodes.append(new_node)
+                
+        # If we are performing the contribution analysis
+        # we have to remove one node from the list of nodes
+        if self.iteration > 0:
+            nodes.pop(self.iteration-1)
+            self.preferences.removed_node_id = self.iteration
+
         return nodes
 
     def start_nodes(self) -> None:
@@ -120,22 +138,6 @@ class Orchestrator:
 
                 ready = []
 
-                # while True:
-                #     import time
-                #     time.sleep(1)
-                #     # catch exception if results are not ready yet
-                #     try:
-                #         ready = [result.ready() for result in results]
-                #         successful = [result.successful() for result in results]
-                #     except Exception:
-                #         continue
-                #     # exit loop if all tasks returned success
-                #     if all(successful):
-                #         break
-                #     # raise exception reporting exceptions received from workers
-                #     if all(ready) and not all(successful):
-                #         raise Exception(f'Workers raised following exceptions {[result._value for result in results if not result.successful()]}')
-
                 count = 0
                 for result in results:
                     logger.debug(f"Popping {count}")
@@ -149,10 +151,10 @@ class Orchestrator:
                     node.federated_model.update_weights(avg)
 
                 logger.debug("Computed the average")
-                self.compute_metrics()
+                self.log_metrics(iteration=iteration)
         logger.debug("Training finished")
 
-    def compute_metrics(self) -> None:
+    def log_metrics(self, iteration:int) -> None:
         logger.debug("Computing metrics...")
         (
             loss,
@@ -161,8 +163,25 @@ class Orchestrator:
             precision,
             recall,
             test_accuracy_per_class,
+            true_positive_rate,
+            false_positive_rate
         ) = self.federated_model.evaluate_model()
+        metrics = {"loss":loss, 
+                    "accuracy": accuracy, 
+                    "fscore": fscore, 
+                    "precision": precision,
+                    "recall": recall, 
+                    "test_accuracy_per_class": test_accuracy_per_class, 
+                    "true_positive_rate": true_positive_rate,
+                    "false_positive_rate": false_positive_rate,
+                    "epoch": iteration}
+        logger.debug(metrics)
         logger.debug("Metrics computed")
+        logger.debug("Logging the metrics on wandb")
+        if self.preferences.wandb:
+            Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
+        logger.debug("Metrics logged")
+
 
     def create_model(self) -> None:
         """This function creates and initialize the model that

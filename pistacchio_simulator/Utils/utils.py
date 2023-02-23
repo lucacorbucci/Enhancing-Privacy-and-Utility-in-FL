@@ -151,7 +151,6 @@ class Utils:
         """
         load_dotenv()
 
-        wandb_project_name = os.getenv("WANDB_PROJECT_NAME")
         wandb_entity = os.getenv("WANDB_ENTITY")
         config_dictionary = preferences.hyperparameters
         config_dictionary["num_nodes"] = preferences.data_split_config["num_nodes"]
@@ -164,7 +163,7 @@ class Utils:
                 "num_communication_round_pre_training"
             ]
         wandb.init(
-            project=wandb_project_name,
+            project=preferences.wandb_project,
             entity=wandb_entity,
             config=config_dictionary,
             group=group,
@@ -186,6 +185,21 @@ class Utils:
             artifact = wandb_run.Artifact("model", type="model")
             artifact.add_file(model_file)
             wandb_run.log_artifact(artifact)
+
+    @staticmethod
+    def log_metrics_to_wandb(
+        wandb_run: ModuleType,
+        metrics: dict
+    ) -> None:
+        """Log metrics to wandb.
+
+        Args:
+            wandb_run (_type_): wandb object
+            metrics (dict): dictionary with all the metrics
+                we want to log
+        """
+        if wandb_run:
+            wandb_run.log(metrics)
 
     @staticmethod
     def log_to_wandb(
