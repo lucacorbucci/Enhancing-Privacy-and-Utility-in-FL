@@ -26,41 +26,50 @@ logger.add(
 
 
 class FederatedNode:
-    """FederatedNode is the component that can be used for the
-    classic Federated Learning.
-    It trains the model locally and then sends the weights to the server.
+    """FederatedNode is the component that can serve as an abstraction
+    class for creating one federated node.
     """
-
 
     def __init__(
         self,
         node_id: str,
-        preferences: Preferences,
+        preferences = None,
+        configuration = None
         # server_channel: CommunicationChannel,
         # logging_queue: CommunicationChannel,
         # receiver_channel: CommunicationChannel | None = None,
-    ) -> None:
-        """Init the Federated Node.
-
+        ) -> None:
+        """Init the Federated Node with either preferences object or 
+            configuration dictionary. 
         Args:
             node_id (str): id of the node
             preferences (Preferences): preferences object of the node that contains
                 all the preferences for this node
+            configuration (dict): configuration dictionary that contains all the
+                preferences for this node.
             # logging_queue (CommunicationChannel): queue that is used to send back the
             #     performances of the node to the main thread.
         """
-        self.node_id = node_id
         # self.logging_queue = logging_queue
-        self.preferences = preferences
-        self.mode = "federated"
         # self.receiver_channel = (
         #     receiver_channel if receiver_channel else CommunicationChannel(name=node_id)
         # )
-        self.mixed = False
-        self.message_counter = 0
         # self.server_channel: CommunicationChannel | None = None
         self.federated_model = None
+        self.message_counter = 0
+        self.mixed = False
 
+        assert preferences or configuration
+        #TODO: Create initialization from preferences.
+        if preferences:
+            self.preferences = preferences
+        else:
+            pass
+        
+        self.mode = "federated"
+        self.node_id = node_id
+        # Print debug function [TO DELETE]
+        print(f"Node {self.node_id} initialized")
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -250,17 +259,17 @@ class FederatedNode:
         """
         logger.debug(f"Starting node {self.node_id}")
         self.federated_model = self.init_federated_model(model)
+        
         # self.receive_starting_model_from_server(federated_model=federated_model)
         # logger.debug(f"Node {self.node_id} received starting model from server")
-
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
-
+        #differential_private_train = self.preferences.server_config[
+            #"differential_privacy_server"
+        #]
         # Initialize differential privacy if needed
         # if differential_private_train:
         #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
+        
         logger.debug(f"Node {self.node_id} started")
 
      
