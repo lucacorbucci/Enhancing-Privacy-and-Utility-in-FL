@@ -1,19 +1,19 @@
-# Libraries import
+# Libraries imports
 import copy, sys, dill, torch, random, multiprocess
-# Modules import
+# Modules imports
 from collections import Counter
 from typing import Any
 from loguru import logger
 from torch import nn
 from concurrent.futures import wait
 from multiprocess.pool import ThreadPool
-from pistacchio_simulator.Utils.phases import Phase
-
-from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
-from pistacchio_simulator.Models.federated_model import FederatedModel
-from pistacchio_simulator.Utils.phases import Phase
-from pistacchio_simulator.Utils.preferences import Preferences
-from pistacchio_simulator.Utils.utils import Utils
+# Cross-library imports
+from pistacchio_light.Utils.phases import Phase
+from pistacchio_light.Components.FederatedNode.federated_node import FederatedNode
+from pistacchio_light.Models.federated_model import FederatedModel
+from pistacchio_light.Utils.phases import Phase
+from pistacchio_light.Utils.preferences import Preferences
+from pistacchio_light.Utils.utils import Utils
 
 
 logger.remove()
@@ -59,9 +59,6 @@ class Orchestrator:
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
         self.federated_model = self.create_model()
-        self.nodes = self.create_nodes()
-        self.start_nodes()
-
         if self.preferences.server_config["differential_privacy_server"]:
             for node in self.nodes:
                 node.federated_model.init_differential_privacy(phase=Phase.SERVER)
@@ -76,10 +73,14 @@ class Orchestrator:
         if self.preferences.wandb:
             Utils.finish_wandb(wandb_run=self.wandb)
 
-    def start_nodes(self) -> None:
+    def connect_nodes(self, nodes, models=None) -> None:
+        """Connects already created nods to the orchestrator."""
 
         logger.debug("Starting nodes...")
-        model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
+        
+        if not models:
+            model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
+        
         manager = multiprocess.Manager()
         communication_queue = manager.Queue()
 
