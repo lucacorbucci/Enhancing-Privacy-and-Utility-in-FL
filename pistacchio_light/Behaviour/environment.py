@@ -1,4 +1,6 @@
 from pistacchio_light.Components.FederatedNode.federated_node import FederatedNode
+from pistacchio_light.Components.Orchestrator.orchestrator import Orchestrator
+
 class manage_environment:
     """This class is used for managing the Federated Learning environment, e.g.
     starting nodes, shutting down selected nodes, simulating random disconnection etc.
@@ -19,9 +21,10 @@ class manage_environment:
         # Creates environment variable that stores information about the environment in which
         # clients reside.
         self.environment = {
-            "population": 0, #  Number of all clients that are available in the population
-            "available_clients": list(), #  Number of actually available clients stored as a list
-            "random_dropout_chance": 0
+            "population": 0, #  Number of all clients that are available in the population.
+            "available_clients": list(), #  Number of actually available clients stored as a list.
+            "random_dropout_chance": 0, # Chance that a client will dropout from the environment.
+            "orchestrator": None # Orchestrator of the whole training
         }
         
         if preferences == None and configuration == None:
@@ -34,9 +37,10 @@ class manage_environment:
         
         #TODO: Initialization from preferences object.
         if preferences:
-            pass
+            self.settings = preferences
         #TODO: Initialization from configuration dictionary.
         else:
+            self.settings = configuration
             self.environment["population"] = configuration["num_nodes"]
     
     def initialize_nodes(self, nodes:list, return_nodes = False) -> dict:
@@ -53,3 +57,7 @@ class manage_environment:
                 print(f"Failed to connect client {node_selected}")
         if return_nodes == True:
             return self.environment
+    
+    def initialize_orchestrator(self):
+        self.environment["orchestrator"] = Orchestrator(configuration=self.settings,\
+                                                        environment=self.environment)

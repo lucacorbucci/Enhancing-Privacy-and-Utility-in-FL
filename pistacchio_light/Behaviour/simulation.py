@@ -16,14 +16,23 @@ class manage_simulation:
         of rounds, return global model together with local models and
         corresponding metrics."""
         
+        # this is a configuration that we can define inside the simulation 
+        # class, an alternative to the Preference object.
         configuration = {"num_nodes": 4,
-                         "nodes": [1, 2, 3, 4]}
+                         "nodes": [1, 2, 3, 4],
+                         "local_epochs": 4,
+                         "training_rounds": 10,
+                         "sampling_size": 4}
         
+        # This is an execution environment, class that encapsulates all
+        # all the 'environmental' variables, included clients and orchestration
+        # server. By using manage_environment we can expand our simulation 
+        # beyond the nodes and orchestration server abstraction.
         execution_environment = manage_environment(configuration=configuration)
-        env_external = execution_environment.initialize_nodes(configuration["nodes"], return_nodes=True)
-        print(env_external)
-        for node in env_external["available_clients"]:
-            print(node)
+        execution_environment.initialize_nodes(configuration["nodes"])
+        execution_environment.initialize_orchestrator()
+        print(execution_environment.environment)
+
 
 if __name__ == "__main__":
     manage_simulation().start_simulation()

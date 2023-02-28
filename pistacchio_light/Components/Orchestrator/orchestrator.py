@@ -39,22 +39,17 @@ def start_train(node):
 class Orchestrator:
     def __init__(
         self,
-        preferences: Preferences,
-        model: nn.Module,
-        iteration: int | None
+        environment: dict,
+        preferences = None,
+        configuration = None,
     ) -> None:
-        self.preferences = preferences
-        self.model = model
-        self.federated_model = None
-        self.validation_set = None
-        self.total_num_nodes = (
-            preferences.data_split_config["num_nodes"]
-            * preferences.data_split_config["num_clusters"]
-        )
-        self.pool_size = 5
-        self.iterations = 2
-        self.sampled_nodes = 5
-        self.iteration = iteration
+        assert preferences or configuration
+        assert environment
+        self.environment = environment
+        if preferences:
+            self.orchestrator_settings = preferences
+        else:
+            self.orchestrator_settings = configuration
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
