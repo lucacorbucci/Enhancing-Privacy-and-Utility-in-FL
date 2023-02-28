@@ -16,6 +16,14 @@ class manage_environment:
         Returns:
             None"""
         
+        # Creates environment variable that stores information about the environment in which
+        # clients reside.
+        self.environment = {
+            "population": 0, #  Number of all clients that are available in the population
+            "available_clients": list(), #  Number of actually available clients stored as a list
+            "random_dropout_chance": 0
+        }
+        
         if preferences == None and configuration == None:
             raise("Initializaiton error. You must initialize environment with\
                   preferences object or configuration object.")
@@ -29,17 +37,19 @@ class manage_environment:
             pass
         #TODO: Initialization from configuration dictionary.
         else:
-            self.num_nodes = configuration["num_nodes"]
+            self.environment["population"] = configuration["num_nodes"]
     
-    def initialize_nodes(self, nodes:list, return_nodes = False) -> list[FederatedNode]:
+    def initialize_nodes(self, nodes:list, return_nodes = False) -> dict:
         """Initializes clients in the environment, loads local 
         datset onto clients and returns a list of them."""
-        self.federated_nodes = []
         for node_selected in nodes:
             new_node = FederatedNode(
                 node_id=node_selected,
                 configuration={"test": 0},
             )
-            self.federated_nodes.append(new_node)
+            if new_node.status == 1:
+                self.environment["available_clients"].append(new_node)
+            else:
+                print(f"Failed to connect client {node_selected}")
         if return_nodes == True:
-            return self.federated_nodes
+            return self.environment

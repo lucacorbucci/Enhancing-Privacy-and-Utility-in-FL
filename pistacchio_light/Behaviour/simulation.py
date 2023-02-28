@@ -20,10 +20,10 @@ class manage_simulation:
                          "nodes": [1, 2, 3, 4]}
         
         execution_environment = manage_environment(configuration=configuration)
-        nodes = execution_environment.initialize_nodes(configuration["nodes"], return_nodes=True)
-        print(nodes)
-        for node in nodes:
-            print(node.node_id)
+        env_external = execution_environment.initialize_nodes(configuration["nodes"], return_nodes=True)
+        print(env_external)
+        for node in env_external["available_clients"]:
+            print(node)
 
 if __name__ == "__main__":
     manage_simulation().start_simulation()

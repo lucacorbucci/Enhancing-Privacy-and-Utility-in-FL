@@ -38,7 +38,7 @@ class FederatedNode:
         # server_channel: CommunicationChannel,
         # logging_queue: CommunicationChannel,
         # receiver_channel: CommunicationChannel | None = None,
-        ) -> None:
+        ) -> int:
         """Init the Federated Node with either preferences object or 
             configuration dictionary. 
         Args:
@@ -58,14 +58,15 @@ class FederatedNode:
         self.federated_model = None
         self.message_counter = 0
         self.mixed = False
+        self.status = 0 # 0 if transaction failed, 1 if connected, 2 if temporary unavailable
 
         assert preferences or configuration
         #TODO: Create initialization from preferences.
         if preferences:
             self.preferences = preferences
+            self.status = 1
         else:
-            pass
-        
+            self.status = 1
         self.mode = "federated"
         self.node_id = node_id
         # Print debug function [TO DELETE]
