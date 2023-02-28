@@ -22,7 +22,7 @@ logger.add(
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
 )
 
-TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
+#TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
 
 
 class FederatedNode:
@@ -30,6 +30,7 @@ class FederatedNode:
     classic Federated Learning.
     It trains the model locally and then sends the weights to the server.
     """
+
 
     def __init__(
         self,
@@ -60,24 +61,6 @@ class FederatedNode:
         # self.server_channel: CommunicationChannel | None = None
         self.federated_model = None
 
-    # def receive_data_from_server(self) -> Any:
-    #     """This function receives the weights from the server.
-    #     If the weights are not received, it returns an error message
-    #     otherwise it returns the weights.
-
-    #     Returns
-    #     -------
-    #         Union[Weights, None]: Weights received from the server
-    #     """
-    #     try:
-    #         received_data = self.receiver_channel.receive_data()
-    #         return (
-    #             received_data
-    #             if received_data == Message.STOP
-    #             else received_data.weights
-    #         )
-    #     except (ValueError, AttributeError):
-    #         return Message.ERROR
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -92,6 +75,7 @@ class FederatedNode:
         else:
             raise ValueError("Server channel not initialized")
 
+
     def add_server_channel(self, server_channel: CommunicationChannel) -> None:
         """This function adds the server channel to the sender thread.
 
@@ -99,6 +83,7 @@ class FederatedNode:
             server_channel (_type_): server channel
         """
         self.server_channel = server_channel
+
 
     def init_federated_model(self, model: nn.Module) -> FederatedModel:
         """Initialize the federated learning model.
@@ -120,7 +105,6 @@ class FederatedNode:
         return federated_model
 
  
-
     def local_training(
         self,
         differential_private_train: bool,
@@ -145,6 +129,7 @@ class FederatedNode:
         else:
             loss, accuracy = self.federated_model.train()
         return {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
+
 
     def send_and_receive_weights_with_server(
         self,
@@ -192,6 +177,7 @@ class FederatedNode:
         else:
             raise NotYetInitializedServerChannelError
 
+
     def compute_performances(
         self,
         loss_list: list,
@@ -235,6 +221,7 @@ class FederatedNode:
 
         return performances
 
+
     def receive_starting_model_from_server(
         self,
         federated_model: FederatedModel,
@@ -249,6 +236,7 @@ class FederatedNode:
         """
         received_weights = self.receive_data_from_server()
         federated_model.update_weights(received_weights)
+
 
     def start_node(self, model: nn.Module) -> None:
         """This method implements all the logic of the federated node.
@@ -320,13 +308,13 @@ class FederatedNode:
             epsilon=metrics["epsilon"],
         )
 
-        # received_weights = self.send_and_receive_weights_with_server(
-        #     federated_model=federated_model,
-        #     metrics=metrics,
-        #     results=results,
-        # )
+        received_weights = self.send_and_receive_weights_with_server(
+            federated_model=federated_model,
+            metrics=metrics,
+            results=results,
+        )
 
-        # Update the weights of the model
-        # federated_model.update_weights(received_weights)
+        #Update the weights of the model
+        federated_model.update_weights(received_weights)
 
-        # return loss_list, accuracy_list, epsilon_list,
+        return loss_list, accuracy_list, epsilon_list,
