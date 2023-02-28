@@ -1,24 +1,20 @@
-import copy
-import sys
+# Libraries import
+import copy, sys, dill, torch, random, multiprocess
+# Modules import
 from collections import Counter
 from typing import Any
-import time
-import dill
-import torch
 from loguru import logger
 from torch import nn
 from concurrent.futures import wait
 from multiprocess.pool import ThreadPool
 from pistacchio_simulator.Utils.phases import Phase
-import random
-import multiprocess
 
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.Models.federated_model import FederatedModel
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-import gc
+
 
 logger.remove()
 logger.add(
@@ -31,7 +27,6 @@ logger.add(
 def start_nodes(node, model, communication_queue):
     new_node = copy.deepcopy(node)
     new_node.federated_model = new_node.init_federated_model(model)
-
     communication_queue.put(new_node)
     return "OK"
 
