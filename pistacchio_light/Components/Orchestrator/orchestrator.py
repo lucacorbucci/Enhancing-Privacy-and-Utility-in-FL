@@ -76,29 +76,6 @@ class Orchestrator:
         if self.preferences.wandb:
             Utils.finish_wandb(wandb_run=self.wandb)
 
-
-    def create_nodes(
-        self,
-    ) -> list[FederatedNode]:
-
-        nodes = []
-        for cluster_id in range(self.preferences.data_split_config["num_clusters"]):
-            for node_id in range(self.preferences.data_split_config["num_nodes"]):
-
-                new_node = FederatedNode(
-                    node_id=f"{node_id}_cluster_{cluster_id}",
-                    preferences=self.preferences,
-                )
-                nodes.append(new_node)
-                
-        # If we are performing the contribution analysis
-        # we have to remove one node from the list of nodes
-        if self.iteration > 0:
-            nodes.pop(self.iteration-1)
-            self.preferences.removed_node_id = self.iteration
-
-        return nodes
-
     def start_nodes(self) -> None:
 
         logger.debug("Starting nodes...")
