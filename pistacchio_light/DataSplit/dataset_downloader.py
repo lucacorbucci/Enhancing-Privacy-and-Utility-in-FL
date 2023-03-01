@@ -1,11 +1,12 @@
+# Libraries imports
+import torch, torchvision
 import numpy as np
-import torch
-import torchvision
+# Modules imports
 from torchvision import datasets, transforms
-
-from pistacchio_simulator.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
-from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
-from pistacchio_simulator.Utils.utils import Utils
+# Cross-library imports
+from pistacchio_light.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
+from pistacchio_light.Exceptions.errors import InvalidDatasetErrorNameError
+from pistacchio_light.Utils.utils import Utils
 
 
 class DatasetDownloader:
