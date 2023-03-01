@@ -4,17 +4,13 @@ from pistacchio_light.Components.Orchestrator.orchestrator import Orchestrator
 class manage_environment:
     """This class is used for managing the Federated Learning environment, e.g.
     starting nodes, shutting down selected nodes, simulating random disconnection etc.
-    Can be initialized either with preferences object or dict containing configuraiton."""
+    Can be initialized with preferences dict containing configuraiton."""
     def __init__(self,
-                 preferences = None,
-                 configuration = None) -> None:
+                 preferences: dict) -> None:
         """Constructor object of manage_environment class. 
         Args:
         preferences (Preferences): preferences object of the node 
             that contains preference for all nodes.
-        configuration (dict): configuration object that can be passed
-            to the constructor insted of preferences object
-            
         Returns:
             None"""
         
@@ -27,21 +23,8 @@ class manage_environment:
             "orchestrator": None # Orchestrator of the whole training
         }
         
-        if preferences == None and configuration == None:
-            raise("Initializaiton error. You must initialize environment with\
-                  preferences object or configuration object.")
-        if preferences != None and configuration != None:
-            raise("Initialization error, ambigious initialization values.\
-                  Please initialize environment with either a preferences \
-                  object or configuration object")
-        
-        #TODO: Initialization from preferences object.
-        if preferences:
-            self.settings = preferences
-        #TODO: Initialization from configuration dictionary.
-        else:
-            self.settings = configuration
-            self.environment["population"] = configuration["num_nodes"]
+        self.preferences = preferences
+        self.environment["population"] = preferences["num_nodes"]
     
     def initialize_nodes(self, nodes:list, return_nodes = False) -> dict:
         """Initializes clients in the environment, loads local 
@@ -49,7 +32,7 @@ class manage_environment:
         for node_selected in nodes:
             new_node = FederatedNode(
                 node_id=node_selected,
-                configuration={"test": 0},
+                preferences=self.preferences["clients_setting"]["general_clients"],
             )
             if new_node.status == 1:
                 self.environment["available_clients"].append(new_node)
@@ -59,5 +42,5 @@ class manage_environment:
             return self.environment
     
     def initialize_orchestrator(self):
-        self.environment["orchestrator"] = Orchestrator(configuration=self.settings,\
+        self.environment["orchestrator"] = Orchestrator(preferences=self.preferences,\
                                                         environment=self.environment)

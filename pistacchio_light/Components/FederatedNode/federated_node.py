@@ -33,8 +33,7 @@ class FederatedNode:
     def __init__(
         self,
         node_id: str,
-        preferences = None,
-        configuration = None
+        preferences: dict,
         # server_channel: CommunicationChannel,
         # logging_queue: CommunicationChannel,
         # receiver_channel: CommunicationChannel | None = None,
@@ -43,10 +42,7 @@ class FederatedNode:
             configuration dictionary. 
         Args:
             node_id (str): id of the node
-            preferences (Preferences): preferences object of the node that contains
-                all the preferences for this node
-            configuration (dict): configuration dictionary that contains all the
-                preferences for this node.
+            preferences (dict): preferences dictionary
             # logging_queue (CommunicationChannel): queue that is used to send back the
             #     performances of the node to the main thread.
         """
@@ -59,16 +55,13 @@ class FederatedNode:
         self.message_counter = 0
         self.mixed = False
         self.status = 0 # 0 if transaction failed, 1 if connected, 2 if temporary unavailable
-
-        assert preferences or configuration
-        #TODO: Create initialization from preferences.
-        if preferences:
+        try:
             self.preferences = preferences
             self.status = 1
-        else:
-            self.status = 1
-        self.mode = "federated"
-        self.node_id = node_id
+            self.mode = "federated"
+            self.node_id = node_id
+        except:
+            print(f"Initialization of node failed.")
         # Print debug function [TO DELETE]
         print(f"Node {self.node_id} initialized")
 

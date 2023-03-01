@@ -40,20 +40,17 @@ class Orchestrator:
     def __init__(
         self,
         environment: dict,
-        preferences = None,
-        configuration = None,
+        preferences: dict
     ) -> None:
-        assert preferences or configuration
-        assert environment
+        assert preferences and environment
         self.environment = environment
-        if preferences:
-            self.orchestrator_settings = preferences
-        else:
-            self.orchestrator_settings = configuration
 
     def launch_orchestrator(self) -> None:
+        # Loads validation data onto the orchestrator instance
         self.load_validation_data()
+        # Creates and load model onto the orchestrator instance
         self.federated_model = self.create_model()
+        
         if self.preferences.server_config["differential_privacy_server"]:
             for node in self.nodes:
                 node.federated_model.init_differential_privacy(phase=Phase.SERVER)
@@ -67,6 +64,59 @@ class Orchestrator:
         self.orchestrate_nodes()
         if self.preferences.wandb:
             Utils.finish_wandb(wandb_run=self.wandb)
+        
+    def load_validation_data(self) -> None:
+        """This function loads the validation data from disk."""
+        data: torch.utils.data.DataLoader[Any] = None
+        
+        #TODO: Examine the dataset namespace, for now fictional loading implemeneted
+        print("Loading real dataset will be added later, now performing fictional initialization")
+        print("Success")
+        return
+        
+        with open(
+            (
+                f"../data/{self.preferences.dataset_name}/federated_split"
+                f"/server_validation/{self.preferences.data_split_config['server_validation_set']}"
+            ),
+            "rb",
+        ) as file:
+            data = dill.load(file)
+        self.validation_set = torch.utils.data.DataLoader(
+            data,
+            batch_size=16,
+            shuffle=False,
+            num_workers=0,
+        )
+
+        if self.preferences.debug:
+            targets = []
+            for _, data in enumerate(self.validation_set, 0):
+                targets.append(data[-1])
+            targets = [item.item() for sublist in targets for item in sublist]
+            logger.info(f"Validation set: {Counter(targets)}")
+    
+    def create_model(self) -> None:
+        """This function creates and initialize the model that
+        we'll use on the server for the validation.
+        """
+        logger.debug("Creating model")
+        orchestrator_model = copy.deepcopy(self.model)
+        model = FederatedModel(
+            dataset_name=self.orchestrator_settings["dataset"],
+            node_name="server",
+            preferences=self.orchestrator_settings,
+        )
+        if model:
+            model.init_model(net=orchestrator_model)
+            model.trainloader = self.validation_set
+            model.testloader = self.validation_set
+
+            if self.preferences.server_config["differential_privacy_server"]:
+                model.net, _, _ = model.init_differential_privacy(phase=Phase.SERVER)
+
+        logger.debug("Model created")
+        return model
 
     def connect_nodes(self, nodes, models=None) -> None:
         """Connects already created nods to the orchestrator."""
@@ -152,51 +202,3 @@ class Orchestrator:
         if self.preferences.wandb:
             Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
         logger.debug("Metrics logged")
-
-
-    def create_model(self) -> None:
-        """This function creates and initialize the model that
-        we'll use on the server for the validation.
-        """
-        logger.debug("Creating model")
-        orchestrator_model = copy.deepcopy(self.model)
-        model = FederatedModel(
-            dataset_name=self.preferences.dataset_name,
-            node_name="server",
-            preferences=self.preferences,
-        )
-        if model:
-            model.init_model(net=orchestrator_model)
-            model.trainloader = self.validation_set
-            model.testloader = self.validation_set
-
-            if self.preferences.server_config["differential_privacy_server"]:
-                model.net, _, _ = model.init_differential_privacy(phase=Phase.SERVER)
-
-        logger.debug("Model created")
-        return model
-
-    def load_validation_data(self) -> None:
-        """This function loads the validation data from disk."""
-        data: torch.utils.data.DataLoader[Any] = None
-        with open(
-            (
-                f"../data/{self.preferences.dataset_name}/federated_split"
-                f"/server_validation/{self.preferences.data_split_config['server_validation_set']}"
-            ),
-            "rb",
-        ) as file:
-            data = dill.load(file)
-        self.validation_set = torch.utils.data.DataLoader(
-            data,
-            batch_size=16,
-            shuffle=False,
-            num_workers=0,
-        )
-
-        if self.preferences.debug:
-            targets = []
-            for _, data in enumerate(self.validation_set, 0):
-                targets.append(data[-1])
-            targets = [item.item() for sublist in targets for item in sublist]
-            logger.info(f"Validation set: {Counter(targets)}")

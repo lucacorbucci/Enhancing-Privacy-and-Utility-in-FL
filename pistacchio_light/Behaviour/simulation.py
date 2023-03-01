@@ -18,18 +18,40 @@ class manage_simulation:
         
         # this is a configuration that we can define inside the simulation 
         # class, an alternative to the Preference object.
-        configuration = {"num_nodes": 4,
+        preferences = {"num_nodes": 4,
                          "nodes": [1, 2, 3, 4],
-                         "local_epochs": 4,
-                         "training_rounds": 10,
-                         "sampling_size": 4}
+                         "dataset": "mnist",
+                         "hyperparameters": {
+                                "batch_size": 32,
+                                "lr": 0.001,
+                                "MAX_PHYSICAL_BATCH_SIZE": 128,
+                                "DELTA": 1e-5,
+                                "noise_multiplier": 0.5,
+                                "max_grad_norm": 1.2,
+                                "weight_decay": 0,
+                                "min_improvement": 0.001,
+                                "patience": 10,
+                                "min_accuracy": 0.80
+                            },
+                         "orchestrator_settings":{
+                            "local_epochs": 4,
+                            "training_rounds": 10,
+                            "sampling_size": 4,
+                            "differential_privacy_server": False
+                            },
+                        "clients_setting":{
+                            'general_clients': {
+                                "test1":0
+                            }
+                        }
+                    }
         
         # This is an execution environment, class that encapsulates all
         # all the 'environmental' variables, included clients and orchestration
         # server. By using manage_environment we can expand our simulation 
         # beyond the nodes and orchestration server abstraction.
-        execution_environment = manage_environment(configuration=configuration)
-        execution_environment.initialize_nodes(configuration["nodes"])
+        execution_environment = manage_environment(preferences=preferences)
+        execution_environment.initialize_nodes(preferences["nodes"])
         execution_environment.initialize_orchestrator()
         print(execution_environment.environment)
 
