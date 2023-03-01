@@ -1,19 +1,17 @@
 """This file is used to generate the dataset for the experiments."""
-
-# TODO: Refactoring this file
-
+# # Libraries import
 import argparse
 import json
 import sys
+# Modules import
 from collections import Counter
-
 from loguru import logger
-
-from pistacchio_simulator.DataSplit.data_split import DataSplit
-from pistacchio_simulator.DataSplit.dataset_downloader import DatasetDownloader
-from pistacchio_simulator.DataSplit.storage_manager import StorageManager
-from pistacchio_simulator.Exceptions.errors import InvalidSplitTypeError
-from pistacchio_simulator.Utils.preferences import Preferences
+# Cross-library imports
+from pistacchio_light.DataSplit.data_split import DataSplit
+from pistacchio_light.DataSplit.dataset_downloader import DatasetDownloader
+from pistacchio_light.DataSplit.storage_manager import StorageManager
+from pistacchio_light.Exceptions.errors import InvalidSplitTypeError
+from pistacchio_light.Utils.preferences import Preferences
 
 
 def print_debug(counters: Counter) -> None:
