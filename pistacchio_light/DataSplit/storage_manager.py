@@ -1,8 +1,5 @@
-import os
+import os, dill
 from typing import Any
-
-import dill
-
 
 class StorageManager:
     """This class is used to store the model on disk."""
@@ -24,7 +21,8 @@ class StorageManager:
             names (List[str]): names of the nodes
         """
         for dataset, file_name in zip(splitted_dataset, names):
-            filename = f"../data/{dataset_name}/federated_split/{dataset_type}/{file_name}_split"
+            filename = os.path.join(os.getcwd(), "generated_datasets", dataset_name,\
+                                    "federated_split", dataset_type, file_name)
             os.makedirs(os.path.dirname(filename), exist_ok=True)
 
             with open(filename, "wb") as file:
@@ -43,7 +41,10 @@ class StorageManager:
             dataset (Any): The dataset to write
             dataset_type (str): The type of the dataset
         """
-        filename = f"../data/{dataset_name}/federated_split/{dataset_type}/{dataset_type}_split"
+        filename = os.path.join(os.getcwd(), "generated_datasets", \
+                                dataset_name, "federated_split",  
+                                dataset_type, dataset_type)
         os.makedirs(os.path.dirname(filename), exist_ok=True)
+        print(f"Writing data at: {filename}")
         with open(filename, "wb") as file:
             dill.dump(dataset, file)

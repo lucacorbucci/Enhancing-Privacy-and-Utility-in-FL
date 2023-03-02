@@ -95,3 +95,22 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 *.pyc
+generated_datasets/mnist/federated_split/server_validation/server_validation
+generated_datasets/mnist/federated_split/test_set/0_cluster_0
+generated_datasets/mnist/federated_split/test_set/0_cluster_1
+generated_datasets/mnist/federated_split/test_set/0_cluster_2
+generated_datasets/mnist/federated_split/test_set/1_cluster_0
+generated_datasets/mnist/federated_split/test_set/1_cluster_1
+generated_datasets/mnist/federated_split/test_set/1_cluster_2
+generated_datasets/mnist/federated_split/test_set/2_cluster_0
+generated_datasets/mnist/federated_split/test_set/2_cluster_1
+generated_datasets/mnist/federated_split/test_set/2_cluster_2
+generated_datasets/mnist/federated_split/train_set/0_cluster_0
+generated_datasets/mnist/federated_split/train_set/0_cluster_1
+generated_datasets/mnist/federated_split/train_set/0_cluster_2
+generated_datasets/mnist/federated_split/train_set/1_cluster_0
+generated_datasets/mnist/federated_split/train_set/1_cluster_1
+generated_datasets/mnist/federated_split/train_set/1_cluster_2
+generated_datasets/mnist/federated_split/train_set/2_cluster_0
+generated_datasets/mnist/federated_split/train_set/2_cluster_1
+generated_datasets/mnist/federated_split/train_set/2_cluster_2

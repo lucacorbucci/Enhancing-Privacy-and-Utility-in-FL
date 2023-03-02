@@ -1,8 +1,6 @@
 """This file is used to generate the dataset for the experiments."""
 # # Libraries import
-import argparse
-import json
-import sys
+import argparse, json, os, sys
 # Modules import
 from collections import Counter
 from loguru import logger
@@ -11,8 +9,7 @@ from pistacchio_light.DataSplit.data_split import DataSplit
 from pistacchio_light.DataSplit.dataset_downloader import DatasetDownloader
 from pistacchio_light.DataSplit.storage_manager import StorageManager
 from pistacchio_light.Exceptions.errors import InvalidSplitTypeError
-from pistacchio_light.Utils.preferences import Preferences
-
+from pistacchio_simulator.Utils.preferences import Preferences
 
 def print_debug(counters: Counter) -> None:
     """This prints the stats of the dataset.
@@ -429,10 +426,16 @@ def generate_splitted_dataset(config: Preferences, custom_dataset: dict = None) 
     print_debug(counters_test)
     store_on_disk(config, cluster_datasets, cluster_datasets_test, test_ds, names)
 
-class Data_Storage:
-    def __init__(self, data_preferences = None, data_configuraiton = None) -> None:
+class Dataset_Manager:
+    def __init__(self) -> None:
         """Data storage is a class that can be used to download, transfer and save to disk
         data that can be used during the experiments with federated learning.
         Similarly to other classes in pistacchio_light, it can accept either preferences
         object (retrieved from json) or configuration dictionary"""
-        pass
+    
+    def configure_dataset(self, json_settup):
+        path = os.path.join("DatasetConfigurations", json_settup)
+        with open(path, "r", encoding="utf-8") as file:
+            config = json.load(file)
+            config = Preferences.generate_from_json(config)
+            generate_splitted_dataset(config=config)

@@ -1,12 +1,9 @@
 import time
-
-from pistacchio_simulator.Exceptions.errors import MissingConfigurationError
-from pistacchio_simulator.Utils.task import Task
-
+from pistacchio_light.Exceptions.errors import MissingConfigurationError
+from pistacchio_light.Utils.task import Task
 
 class Preferences:
     """Definition of the class Preferences, used to store the configuration."""
-
     def __init__(
         self,
         task: str,

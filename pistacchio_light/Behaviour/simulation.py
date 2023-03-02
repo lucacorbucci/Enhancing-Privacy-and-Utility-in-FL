@@ -1,5 +1,6 @@
 from pistacchio_light.Components.Orchestrator.orchestrator import Orchestrator
 from pistacchio_light.Behaviour.environment import manage_environment
+from pistacchio_light.DataSplit.generate_dataset import Dataset_Manager
 
 
 class manage_simulation:
@@ -46,6 +47,9 @@ class manage_simulation:
                         }
                     }
         
+        dataset = Dataset_Manager()
+        dataset.configure_dataset("classic_percentage.json")
+        
         # This is an execution environment, class that encapsulates all
         # all the 'environmental' variables, included clients and orchestration
         # server. By using manage_environment we can expand our simulation 
@@ -53,7 +57,6 @@ class manage_simulation:
         execution_environment = manage_environment(preferences=preferences)
         execution_environment.initialize_nodes(preferences["nodes"])
         execution_environment.initialize_orchestrator()
-        print(execution_environment.environment)
 
 
 if __name__ == "__main__":
