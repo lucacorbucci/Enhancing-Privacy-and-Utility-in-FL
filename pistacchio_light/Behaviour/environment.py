@@ -1,7 +1,8 @@
+from loguru import logger
 from pistacchio_light.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_light.Components.Orchestrator.orchestrator import Orchestrator
 
-class manage_environment:
+class Manage_Environment:
     """This class is used for managing the Federated Learning environment, e.g.
     starting nodes, shutting down selected nodes, simulating random disconnection etc.
     Can be initialized with preferences dict containing configuraiton."""
@@ -36,11 +37,20 @@ class manage_environment:
             )
             if new_node.status == 1:
                 self.environment["available_clients"].append(new_node)
+                logger.debug(f"Information from envrionment: Node {node_selected} joined the environment.")
             else:
-                print(f"Failed to connect client {node_selected}")
+                if self.preferences["verbose"] >= 1:
+                    logger.debug(f"Information from envrionment: Client {node_selected} failed to join the envrionment.")
         if return_nodes == True:
             return self.environment
     
     def initialize_orchestrator(self):
         self.environment["orchestrator"] = Orchestrator(preferences=self.preferences,\
                                                         environment=self.environment)
+        self.environment["orchestrator"].launch_orchestrator()
+
+        orchestrator = self.environment["orchestrator"]
+        if self.preferences["verbose"] >= 1:
+            logger.debug(f"Information from envrionment: Orchestrator {orchestrator} joined the envrionment")
+            logger.debug(f"Orchestrator will deploy model: {orchestrator.orchestrator_model}")
+            logger.debug(f"Orchestrator have a validation dataset: {orchestrator.validation_set}")

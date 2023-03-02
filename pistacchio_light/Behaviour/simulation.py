@@ -1,6 +1,8 @@
 from pistacchio_light.Components.Orchestrator.orchestrator import Orchestrator
-from pistacchio_light.Behaviour.environment import manage_environment
+from pistacchio_light.Behaviour.environment import Manage_Environment
 from pistacchio_light.DataSplit.generate_dataset import Dataset_Manager
+
+
 
 
 class manage_simulation:
@@ -22,6 +24,8 @@ class manage_simulation:
         preferences = {"num_nodes": 4,
                          "nodes": [1, 2, 3, 4],
                          "dataset": "mnist",
+                         "model": "mnist",
+                         "verbose": 2,
                          "hyperparameters": {
                                 "batch_size": 32,
                                 "lr": 0.001,
@@ -54,7 +58,7 @@ class manage_simulation:
         # all the 'environmental' variables, included clients and orchestration
         # server. By using manage_environment we can expand our simulation 
         # beyond the nodes and orchestration server abstraction.
-        execution_environment = manage_environment(preferences=preferences)
+        execution_environment = Manage_Environment(preferences=preferences)
         execution_environment.initialize_nodes(preferences["nodes"])
         execution_environment.initialize_orchestrator()
 

@@ -26,10 +26,6 @@ logger.add(
 
 
 class FederatedNode:
-    """FederatedNode is the component that can serve as an abstraction
-    class for creating one federated node.
-    """
-
     def __init__(
         self,
         node_id: str,
@@ -38,8 +34,9 @@ class FederatedNode:
         # logging_queue: CommunicationChannel,
         # receiver_channel: CommunicationChannel | None = None,
         ) -> int:
-        """Init the Federated Node with either preferences object or 
-            configuration dictionary. 
+        """FederatedNode is the component that can serve as an abstraction
+            class for creating one federated node. It is a classic federated node
+            that serves as an individual client that has joined the network.
         Args:
             node_id (str): id of the node
             preferences (dict): preferences dictionary

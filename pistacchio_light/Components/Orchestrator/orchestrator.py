@@ -1,5 +1,5 @@
 # Libraries imports
-import copy, sys, dill, torch, random, multiprocess
+import copy, sys, dill, torch, random, multiprocess, os
 # Modules imports
 from collections import Counter
 from typing import Any
@@ -14,6 +14,7 @@ from pistacchio_light.Models.federated_model import FederatedModel
 from pistacchio_light.Utils.phases import Phase
 from pistacchio_light.Utils.preferences import Preferences
 from pistacchio_light.Utils.utils import Utils
+from pistacchio_light.Models.model_selection import get_model
 
 
 logger.remove()
@@ -22,7 +23,6 @@ logger.add(
     colorize=True,
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
 )
-
 
 def start_nodes(node, model, communication_queue):
     new_node = copy.deepcopy(node)
@@ -42,82 +42,63 @@ class Orchestrator:
         environment: dict,
         preferences: dict
     ) -> None:
+        """Orchestrator is an abstraction object that emulates 
+        a classic orchestrator in federated learning. It connects
+        to the nodes that are already initialized in the environment
+        and performs an indicated number of traning rounds.
+        
+        Args:
+            environment (dict): Information about the available 
+            environment that was previously initialized with the 
+            Manage_Environment class.
+            preferences (dict): Preferences for the training.
+        
+        Returns:
+            None"""
+        
         assert preferences and environment
         self.environment = environment
+        self.preferences = preferences
 
     def launch_orchestrator(self) -> None:
         # Loads validation data onto the orchestrator instance
         self.load_validation_data()
         # Creates and load model onto the orchestrator instance
-        self.federated_model = self.create_model()
+        self.orchestrator_model = get_model(self.preferences["model"])                
+
+        #if self.preferences.wandb:
+            #self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
+        #self.orchestrate_nodes()
+        #if self.preferences.wandb:
+            #Utils.finish_wandb(wandb_run=self.wandb)
         
-        if self.preferences.server_config["differential_privacy_server"]:
-            for node in self.nodes:
-                node.federated_model.init_differential_privacy(phase=Phase.SERVER)
-        
-        # We want to be sure that the number of nodes that we 
-        # sample at each iteration is always less or equal to the 
-        # total number of nodes.
-        self.sampled_nodes = min(self.sampled_nodes, len(self.nodes))
-        if self.preferences.wandb:
-            self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
-        self.orchestrate_nodes()
-        if self.preferences.wandb:
-            Utils.finish_wandb(wandb_run=self.wandb)
-        
-    def load_validation_data(self) -> None:
-        """This function loads the validation data from disk."""
+    def load_validation_data(self, from_disk=True, dataset = None) -> None:
+        """This function loads the validation data for the orchestrator.
+        By default, it loads data from the disk.
+        The data can also be loaded directly """
         data: torch.utils.data.DataLoader[Any] = None
-        
-        #TODO: Examine the dataset namespace, for now fictional loading implemeneted
-        print("Loading real dataset will be added later, now performing fictional initialization")
-        print("Success")
-        return
-        
-        with open(
-            (
-                f"../data/{self.preferences.dataset_name}/federated_split"
-                f"/server_validation/{self.preferences.data_split_config['server_validation_set']}"
-            ),
-            "rb",
-        ) as file:
-            data = dill.load(file)
+        if from_disk == True:
+            with open(
+                (
+                    os.path.join(os.getcwd(), "generated_datasets", self.preferences["dataset"],
+                                 "federated_split", "server_validation", "server_validation")
+                ),
+                "rb",
+            ) as file:
+                data = dill.load(file)
         self.validation_set = torch.utils.data.DataLoader(
             data,
             batch_size=16,
             shuffle=False,
             num_workers=0,
         )
-
-        if self.preferences.debug:
+        if self.preferences["verbose"] >= 2:
             targets = []
             for _, data in enumerate(self.validation_set, 0):
                 targets.append(data[-1])
             targets = [item.item() for sublist in targets for item in sublist]
-            logger.info(f"Validation set: {Counter(targets)}")
+            logger.info(f"Information from orchestrator: Validation set, loaded: {Counter(targets)}")
     
-    def create_model(self) -> None:
-        """This function creates and initialize the model that
-        we'll use on the server for the validation.
-        """
-        logger.debug("Creating model")
-        orchestrator_model = copy.deepcopy(self.model)
-        model = FederatedModel(
-            dataset_name=self.orchestrator_settings["dataset"],
-            node_name="server",
-            preferences=self.orchestrator_settings,
-        )
-        if model:
-            model.init_model(net=orchestrator_model)
-            model.trainloader = self.validation_set
-            model.testloader = self.validation_set
-
-            if self.preferences.server_config["differential_privacy_server"]:
-                model.net, _, _ = model.init_differential_privacy(phase=Phase.SERVER)
-
-        logger.debug("Model created")
-        return model
-
     def connect_nodes(self, nodes, models=None) -> None:
         """Connects already created nods to the orchestrator."""
 
