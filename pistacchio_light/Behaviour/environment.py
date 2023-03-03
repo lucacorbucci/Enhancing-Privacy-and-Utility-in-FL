@@ -55,5 +55,5 @@ class Manage_Environment:
             logger.debug(f"Orchestrator will deploy model: {orchestrator.orchestrator_model}")
             logger.debug(f"Orchestrator have a validation dataset: {orchestrator.validation_set}")
     
-    def train_orchestrator(self):
+    def initialize_training(self, protocol=None):
         self.environment["orchestrator"].connect_nodes()

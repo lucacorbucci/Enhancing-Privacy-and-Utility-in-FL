@@ -110,19 +110,19 @@ class Orchestrator:
         """Connects already created nods to the orchestrator."""
 
         logger.debug("Connecting available nodes")
-        nodes = self.environment['vailable_client']
+        nodes = self.environment['available_clients']
         # Creating copies of the models to freely modify the weights of each model.
         # Alternative to this is to provide list of models to connect_nodes arguments
         if not models_list:
-            model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
+            model_list = [copy.deepcopy(self.orchestrator_model) for _ in range(len(nodes))]
         
         manager = multiprocess.Manager()
         communication_queue = manager.Queue()
 
-        with multiprocess.Pool(self.pool_size) as pool:
+        with multiprocess.Pool(len(nodes)) as pool:
             results = [
                 pool.apply_async(start_nodes, (node, model, communication_queue))
-                for node, model in zip(self.nodes, model_list)
+                for node, model in zip(nodes, model_list)
             ]
             self.connect_nodes = []
             for result in results:
@@ -132,7 +132,7 @@ class Orchestrator:
         logger.debug("Nodes connected")
         logger.deub(f"A list of nodes connected: {self.connect_nodes}")
 
-    def orchestrate_nodes(
+    def simple_protocol(
         self,
     ) -> None:
         logger.debug("Orchestrating nodes...")

@@ -1,5 +1,4 @@
-import sys
-import time
+import sys, time, os
 from typing import Any, Mapping, TypeVar
 
 from loguru import logger
@@ -30,9 +29,6 @@ class FederatedNode:
         self,
         node_id: str,
         preferences: dict,
-        # server_channel: CommunicationChannel,
-        # logging_queue: CommunicationChannel,
-        # receiver_channel: CommunicationChannel | None = None,
         ) -> int:
         """FederatedNode is the component that can serve as an abstraction
             class for creating one federated node. It is a classic federated node
@@ -43,11 +39,6 @@ class FederatedNode:
             # logging_queue (CommunicationChannel): queue that is used to send back the
             #     performances of the node to the main thread.
         """
-        # self.logging_queue = logging_queue
-        # self.receiver_channel = (
-        #     receiver_channel if receiver_channel else CommunicationChannel(name=node_id)
-        # )
-        # self.server_channel: CommunicationChannel | None = None
         self.federated_model = None
         self.message_counter = 0
         self.mixed = False
@@ -58,10 +49,12 @@ class FederatedNode:
             self.mode = "federated"
             self.node_id = node_id
         except:
-            print(f"Initialization of node failed.")
-        # Print debug function [TO DELETE]
-        print(f"Node {self.node_id} initialized")
-
+            logger.warning(f"Initialization of node {node_id} failed.")
+        logger.info(f"Node {self.node_id} initialized")
+    
+    def load_local_data(self, from_disk = False):
+        print("Loading local data")
+    
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
 

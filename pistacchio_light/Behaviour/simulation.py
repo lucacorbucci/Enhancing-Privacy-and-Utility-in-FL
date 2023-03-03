@@ -22,7 +22,7 @@ class manage_simulation:
         # this is a configuration that we can define inside the simulation 
         # class, an alternative to the Preference object.
         preferences = {"num_nodes": 4,
-                         "nodes": [1, 2, 3, 4],
+                         "nodes": [0, 1, 2, 3],
                          "dataset": "mnist",
                          "model": "mnist",
                          "verbose": 2,
@@ -61,6 +61,7 @@ class manage_simulation:
         execution_environment = Manage_Environment(preferences=preferences)
         execution_environment.initialize_nodes(preferences["nodes"])
         execution_environment.initialize_orchestrator()
+        #execution_environment.initialize_training()
 
 
 if __name__ == "__main__":
