@@ -39,7 +39,6 @@ def start_train(node):
 class Orchestrator:
     def __init__(
         self,
-        environment: dict,
         preferences: dict
     ) -> None:
         """Orchestrator is an abstraction object that emulates 
@@ -48,17 +47,25 @@ class Orchestrator:
         and performs an indicated number of traning rounds.
         
         Args:
-            environment (dict): Information about the available 
-            environment that was previously initialized with the 
-            Manage_Environment class.
             preferences (dict): Preferences for the training.
         
         Returns:
             None"""
-        
-        assert preferences and environment
-        self.environment = environment
+        assert preferences
         self.preferences = preferences
+    
+    def refresh_environment(self, environemt: dict) -> None:
+        """This class refreshes the envrionment that is simulated 
+        outside the orchestrator.
+        
+        Args:
+            environment (dict): Information about the available 
+            environment that was previously initialized with the 
+            Manage_Environment class.
+        
+        Returns:
+            None"""
+        self.environment = environemt
 
     def launch_orchestrator(self) -> None:
         # Loads validation data onto the orchestrator instance
@@ -99,12 +106,14 @@ class Orchestrator:
             targets = [item.item() for sublist in targets for item in sublist]
             logger.info(f"Information from orchestrator: Validation set, loaded: {Counter(targets)}")
     
-    def connect_nodes(self, nodes, models=None) -> None:
+    def connect_nodes(self, models_list=None) -> None:
         """Connects already created nods to the orchestrator."""
 
-        logger.debug("Starting nodes...")
-        
-        if not models:
+        logger.debug("Connecting available nodes")
+        nodes = self.environment['vailable_client']
+        # Creating copies of the models to freely modify the weights of each model.
+        # Alternative to this is to provide list of models to connect_nodes arguments
+        if not models_list:
             model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
         
         manager = multiprocess.Manager()
@@ -115,12 +124,13 @@ class Orchestrator:
                 pool.apply_async(start_nodes, (node, model, communication_queue))
                 for node, model in zip(self.nodes, model_list)
             ]
-            self.nodes = []
+            self.connect_nodes = []
             for result in results:
                 _ = result.get()
-                self.nodes.append(communication_queue.get())
+                self.connect_nodes.append(communication_queue.get())
 
-        logger.debug("Nodes started")
+        logger.debug("Nodes connected")
+        logger.deub(f"A list of nodes connected: {self.connect_nodes}")
 
     def orchestrate_nodes(
         self,

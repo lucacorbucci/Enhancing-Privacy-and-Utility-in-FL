@@ -45,12 +45,15 @@ class Manage_Environment:
             return self.environment
     
     def initialize_orchestrator(self):
-        self.environment["orchestrator"] = Orchestrator(preferences=self.preferences,\
-                                                        environment=self.environment)
+        self.environment["orchestrator"] = Orchestrator(preferences=self.preferences)
         self.environment["orchestrator"].launch_orchestrator()
+        self.environment["orchestrator"].refresh_environment(self.environment)
 
         orchestrator = self.environment["orchestrator"]
         if self.preferences["verbose"] >= 1:
             logger.debug(f"Information from envrionment: Orchestrator {orchestrator} joined the envrionment")
             logger.debug(f"Orchestrator will deploy model: {orchestrator.orchestrator_model}")
             logger.debug(f"Orchestrator have a validation dataset: {orchestrator.validation_set}")
+    
+    def train_orchestrator(self):
+        self.environment["orchestrator"].connect_nodes()
