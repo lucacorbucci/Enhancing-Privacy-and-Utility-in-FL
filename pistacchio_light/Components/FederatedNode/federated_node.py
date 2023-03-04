@@ -1,17 +1,18 @@
-import sys, time, os
+import sys, time, os, dill
 from typing import Any, Mapping, TypeVar
 
 from loguru import logger
 from torch import Tensor, nn
+from torch.utils.data import DataLoader
 
-from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
-from pistacchio_simulator.Models.federated_model import FederatedModel
-from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
-from pistacchio_simulator.Utils.end_messages import Message
-from pistacchio_simulator.Utils.performances import Performances
-from pistacchio_simulator.Utils.phases import Phase
-from pistacchio_simulator.Utils.preferences import Preferences
-from pistacchio_simulator.Utils.weights import Weights
+from pistacchio_light.Exceptions.errors import NotYetInitializedServerChannelError
+from pistacchio_light.Models.federated_model import FederatedModel
+from pistacchio_light.Utils.communication_channel import CommunicationChannel
+from pistacchio_light.Utils.end_messages import Message
+from pistacchio_light.Utils.performances import Performances
+from pistacchio_light.Utils.phases import Phase
+from pistacchio_light.Utils.preferences import Preferences
+from pistacchio_light.Utils.weights import Weights
 
 
 logger.remove()
@@ -39,21 +40,71 @@ class FederatedNode:
             # logging_queue (CommunicationChannel): queue that is used to send back the
             #     performances of the node to the main thread.
         """
+        self.status = 0 # 0 if transaction failed, 1 if successful
         self.federated_model = None
         self.message_counter = 0
         self.mixed = False
-        self.status = 0 # 0 if transaction failed, 1 if connected, 2 if temporary unavailable
         try:
             self.preferences = preferences
-            self.status = 1
             self.mode = "federated"
             self.node_id = node_id
+            self.status = 1
+            logger.info(f"Node {self.node_id} initialized")
         except:
             logger.warning(f"Initialization of node {node_id} failed.")
-        logger.info(f"Node {self.node_id} initialized")
+
+    def connect_node(self, model: nn.Module) -> FederatedModel:
+        """Initialize the federated learning model.
+
+        Args:
+            model (_type_): _description_
+
+        Returns
+        -------
+            FederatedModel: _description_
+        """
+        self.load_local_data()
+        federated_model: FederatedModel = FederatedModel(
+            node_name=self.node_id,
+            preferences=self.preferences,
+        )
+        federated_model.init_model(net=model,
+                                   local_dataset=[self.local_traindata, self.local_testdata])
+        return federated_model
     
-    def load_local_data(self, from_disk = False):
-        print("Loading local data")
+    def load_local_data(self, 
+                        from_disk = True, 
+                        data = None) -> None:
+        self.status = 0
+        if from_disk:
+            logger.info(f"Node {self.node_id} is trying to load it's data")
+            try:
+                trn_path = os.path.join(os.getcwd(),\
+                                f"generated_datasets",
+                                self.preferences["dataset"],\
+                                self.preferences["task_specification"],\
+                                "train_set", f"{self.node_id}_cluster_0")
+                tst_path = os.path.join(os.getcwd(),\
+                                f"generated_datasets",
+                                self.preferences["dataset"],\
+                                self.preferences["task_specification"],\
+                                "test_set", f"{self.node_id}_cluster_0")
+                with open(trn_path, 'rb') as file:
+                    self.local_traindata = dill.load(file)
+                with open(tst_path, 'rb') as file:
+                    self.local_testdata = dill.load(file)
+                self.status = 1
+            except:
+                logger.warning(f"An error occured, {self.node_id} failed to load the data.")
+        else:
+            logger.info(f"Node {self.node_id} is trying to load the passed dataset")
+            try:
+                self.local_traindata = data[0]
+                self.local_testdata = data[1]
+                self.status = 1
+            except:
+                logger.warning(f"An error occured, {self.node_id} failed to load the data.")
+
     
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -77,27 +128,6 @@ class FederatedNode:
         """
         self.server_channel = server_channel
 
-
-    def init_federated_model(self, model: nn.Module) -> FederatedModel:
-        """Initialize the federated learning model.
-
-        Args:
-            model (_type_): _description_
-
-        Returns
-        -------
-            FederatedModel: _description_
-        """
-        federated_model: FederatedModel = FederatedModel(
-            dataset_name=self.preferences.dataset_name,
-            node_name=self.node_id,
-            preferences=self.preferences,
-        )
-        federated_model.init_model(net=model)
-
-        return federated_model
-
- 
     def local_training(
         self,
         differential_private_train: bool,

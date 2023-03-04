@@ -24,9 +24,9 @@ logger.add(
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
 )
 
-def start_nodes(node, model, communication_queue):
+def connect_node(node, model, communication_queue):
     new_node = copy.deepcopy(node)
-    new_node.federated_model = new_node.init_federated_model(model)
+    new_node.federated_model = new_node.connect_node(model)
     communication_queue.put(new_node)
     return "OK"
 
@@ -82,7 +82,7 @@ class Orchestrator:
     def load_validation_data(self, from_disk=True, dataset = None) -> None:
         """This function loads the validation data for the orchestrator.
         By default, it loads data from the disk.
-        The data can also be loaded directly """
+        The data can also be loaded directly in the method call."""
         data: torch.utils.data.DataLoader[Any] = None
         if from_disk == True:
             with open(
@@ -121,7 +121,7 @@ class Orchestrator:
 
         with multiprocess.Pool(len(nodes)) as pool:
             results = [
-                pool.apply_async(start_nodes, (node, model, communication_queue))
+                pool.apply_async(connect_node, (node, model, communication_queue))
                 for node, model in zip(nodes, model_list)
             ]
             self.connect_nodes = []
@@ -130,7 +130,7 @@ class Orchestrator:
                 self.connect_nodes.append(communication_queue.get())
 
         logger.debug("Nodes connected")
-        logger.deub(f"A list of nodes connected: {self.connect_nodes}")
+        logger.debug(f"A list of nodes connected: {self.connect_nodes}")
 
     def simple_protocol(
         self,

@@ -25,6 +25,7 @@ class manage_simulation:
                          "nodes": [0, 1, 2, 3],
                          "dataset": "mnist",
                          "model": "mnist",
+                         "task_specification": "federated_split",
                          "verbose": 2,
                          "hyperparameters": {
                                 "batch_size": 32,
@@ -61,7 +62,7 @@ class manage_simulation:
         execution_environment = Manage_Environment(preferences=preferences)
         execution_environment.initialize_nodes(preferences["nodes"])
         execution_environment.initialize_orchestrator()
-        #execution_environment.initialize_training()
+        execution_environment.initialize_training()
 
 
 if __name__ == "__main__":

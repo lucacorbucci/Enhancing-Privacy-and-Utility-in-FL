@@ -33,7 +33,7 @@ class Manage_Environment:
         for node_selected in nodes:
             new_node = FederatedNode(
                 node_id=node_selected,
-                preferences=self.preferences["clients_setting"]["general_clients"],
+                preferences=self.preferences,
             )
             if new_node.status == 1:
                 self.environment["available_clients"].append(new_node)
