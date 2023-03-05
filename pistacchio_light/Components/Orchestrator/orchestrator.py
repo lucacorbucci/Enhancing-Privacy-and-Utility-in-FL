@@ -21,7 +21,7 @@ logger.remove()
 logger.add(
     sys.stdout,
     colorize=True,
-    format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
+    format="<red>{time:YYYY-MM-DD at HH:mm:ss}</red> | {level} | {message}",
 )
 
 def connect_node(node, model, communication_queue):
@@ -37,10 +37,7 @@ def start_train(node):
 
 
 class Orchestrator:
-    def __init__(
-        self,
-        preferences: dict
-    ) -> None:
+    def __init__(self, preferences: dict) -> None:
         """Orchestrator is an abstraction object that emulates 
         a classic orchestrator in federated learning. It connects
         to the nodes that are already initialized in the environment
@@ -55,8 +52,11 @@ class Orchestrator:
         self.preferences = preferences
     
     def refresh_environment(self, environemt: dict) -> None:
-        """This class refreshes the envrionment that is simulated 
-        outside the orchestrator.
+        """Refreshes the envrionment that is simulated 
+        outside the orchestrator. As the environment can change 
+        outside the orchestrator (e.g. clients can disconnect or
+        malfunction), refresh_envrionment should be called each 
+        time we want made any changes to it.
         
         Args:
             environment (dict): Information about the available 
@@ -67,11 +67,33 @@ class Orchestrator:
             None"""
         self.environment = environemt
 
-    def launch_orchestrator(self) -> None:
-        # Loads validation data onto the orchestrator instance
-        self.load_validation_data()
-        # Creates and load model onto the orchestrator instance
-        self.orchestrator_model = get_model(self.preferences["model"])                
+    def launch_orchestrator(self, dataset = None, model = None) -> None:
+        """Launches the orchestrator and prepares it for traning.
+        This method will invoke self.load_validation_data and
+        self.get_model. Upon succesful execution, the initialazed
+        orchestrator will load validation data and prepare the model
+        indicated in self.preferences["model"]. It is also possible to
+        pass a custom model as the function argument.
+        
+        Args:
+            dataset (torch.utils.data.DataLoader[Any]): dataset that we want to use.
+            model (nn.Model): model that we want to use."""
+        
+        # Loads validation data onto the orchestrator instance.
+        # If the dataset is not passed as an argument, it will 
+        # try to load the dataset assuming standard file directory structure.
+        if dataset:
+            self.validation_set = dataset
+        else:
+            self.load_validation_data()
+        
+        # Creates and load model onto the orchestrator instance.
+        # If the model is not passed as an argument, it will try to
+        # load the model given the preferences dictionary.
+        if model:
+            self.orchestrator_model = model
+        else:
+            self.orchestrator_model = get_model(self.preferences["model"])                
 
         #if self.preferences.wandb:
             #self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
@@ -79,41 +101,69 @@ class Orchestrator:
         #if self.preferences.wandb:
             #Utils.finish_wandb(wandb_run=self.wandb)
         
-    def load_validation_data(self, from_disk=True, dataset = None) -> None:
-        """This function loads the validation data for the orchestrator.
-        By default, it loads data from the disk.
-        The data can also be loaded directly in the method call."""
+    def load_validation_data(self, return_loaded_data = False) -> None:
+        """Loads the validation data for the orchestrator.
+        By default, it loads data from the disk. Note that the data must
+        be stored in a standard file directory structure.
+        Standard file structure:
+        ./generated_datasets
+            /server_validation
+                server_validation (binary)
+            /test_set
+                {node_id}_cluster_0 (binary)
+                {node_id}_cluster_0 (binary)
+            /train_set
+                {node_id}_cluster_0 (binary)
+                {node_id}_cluster_0 (binary)
+        
+        Args:
+            return_loaded_data (Bool): If True, method will return the loaded dataset.
+            
+        Returns:
+            None: if return_loaded_data == False
+            dataset (torch.utils.data.DataLoader[Any]): if return_loaded_data == True"""
+        
         data: torch.utils.data.DataLoader[Any] = None
-        if from_disk == True:
-            with open(
-                (
-                    os.path.join(os.getcwd(), "generated_datasets", self.preferences["dataset"],
+        with open(
+            (
+                os.path.join(os.getcwd(), "generated_datasets", self.preferences["dataset"],
                                  "federated_split", "server_validation", "server_validation")
-                ),
-                "rb",
+            ), "rb",
             ) as file:
-                data = dill.load(file)
-        self.validation_set = torch.utils.data.DataLoader(
-            data,
-            batch_size=16,
-            shuffle=False,
-            num_workers=0,
-        )
+            data = dill.load(file)
+            self.validation_set = torch.utils.data.DataLoader(
+                data,
+                batch_size=16,
+                shuffle=False,
+                num_workers=0,
+            )
         if self.preferences["verbose"] >= 2:
             targets = []
             for _, data in enumerate(self.validation_set, 0):
                 targets.append(data[-1])
             targets = [item.item() for sublist in targets for item in sublist]
             logger.info(f"Information from orchestrator: Validation set, loaded: {Counter(targets)}")
+        
+        if return_loaded_data:
+            return self.validation_set
     
     def connect_nodes(self, models_list=None) -> None:
-        """Connects already created nods to the orchestrator."""
+        """Connects already created nods to the orchestrator.
+        Note that nodes must be already initialized in the envrionment.
+        It is possible to send arbitraty list of models to the nodes using
+        model_list. If not provided, orchestrator will copy its model.
+        
+        Args:
+            model_list (list): Optional, a list containing models that we want to
+            provide to client. Number of models must equal number of nodes."""
 
         logger.debug("Connecting available nodes")
         nodes = self.environment['available_clients']
+
+        if models_list:
+            raise("Sending models to nodes by providing models_list is not yet implemeneted.")
         # Creating copies of the models to freely modify the weights of each model.
-        # Alternative to this is to provide list of models to connect_nodes arguments
-        if not models_list:
+        else:
             model_list = [copy.deepcopy(self.orchestrator_model) for _ in range(len(nodes))]
         
         manager = multiprocess.Manager()
@@ -124,13 +174,13 @@ class Orchestrator:
                 pool.apply_async(connect_node, (node, model, communication_queue))
                 for node, model in zip(nodes, model_list)
             ]
-            self.connect_nodes = []
+            self.connected_nodes = []
             for result in results:
                 _ = result.get()
-                self.connect_nodes.append(communication_queue.get())
+                self.connected_nodes.append(communication_queue.get())
 
         logger.debug("Nodes connected")
-        logger.debug(f"A list of nodes connected: {self.connect_nodes}")
+        logger.debug(f"A list of nodes connected: {self.connected_nodes}")
 
     def simple_protocol(
         self,
