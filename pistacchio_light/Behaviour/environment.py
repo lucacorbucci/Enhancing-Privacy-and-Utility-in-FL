@@ -41,13 +41,17 @@ class Manage_Environment:
             else:
                 if self.preferences["verbose"] >= 1:
                     logger.debug(f"Information from envrionment: Client {node_selected} failed to join the envrionment.")
+            
+        if self.preferences["verbose"] >= 1:
+            for node in self.environment["available_clients"]:
+                logger.debug(f"Node {node} appeared in the network.")
         if return_nodes == True:
             return self.environment
     
     def initialize_orchestrator(self):
-        self.environment["orchestrator"] = Orchestrator(preferences=self.preferences)
+        self.environment["orchestrator"] = Orchestrator(preferences=self.preferences, environment=self.environment)
         self.environment["orchestrator"].launch_orchestrator()
-        self.environment["orchestrator"].refresh_environment(self.environment)
+        #self.environment["orchestrator"].refresh_environment(self.environment)
 
         orchestrator = self.environment["orchestrator"]
         if self.preferences["verbose"] >= 1:
@@ -57,3 +61,4 @@ class Manage_Environment:
     
     def initialize_training(self, protocol=None):
         self.environment["orchestrator"].connect_nodes()
+        #self.environment["orchestrator"].simple_protocol()
