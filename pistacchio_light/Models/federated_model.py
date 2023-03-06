@@ -84,7 +84,10 @@ class FederatedModel(ABC, Generic[TDestination]):
             net (nn.Module): model we want to use
             local_daset (list): python list of format: [train_dataset, test_dataset]
         """
-        self.trainloader, self.testloader = self.prepare_data(local_dataset)
+        if self.node_name != "orchestrator":
+            self.trainloader, self.testloader = self.prepare_data(local_dataset)
+        else:
+            self.testloader = self.prepare_data(local_dataset)
 
         self.add_model(net)
         if self.net:
@@ -127,7 +130,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         ------
             Exception: Preference is not initialized
         """
-        if self.preferences:
+        if self.preferences and self.node_name != 'orchestrator':
             batch_size = self.preferences["hyperparameters"]["batch_size"]
             trainloader = torch.utils.data.DataLoader(
                 local_dataset[0],
@@ -142,11 +145,16 @@ class FederatedModel(ABC, Generic[TDestination]):
                 shuffle=False,
                 num_workers=0,
             )
-
             #self.print_data_stats(trainloader)
             return trainloader, testloader
-
-        raise NotYetInitializedPreferencesError
+        else:
+            testloader = torch.utils.data.DataLoader(
+                local_dataset[0],
+                batch_size=16,
+                shuffle=False,
+                num_workers=0,
+            )
+            return testloader
 
     def print_data_stats(self, trainloader: torch.utils.data.DataLoader) -> None:
         """Debug function used to print stats about the loaded datasets.
@@ -243,7 +251,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             running_loss = 0.0
             total_correct = 0
             total = 0
-            self.net = self.net.to(self.device)
+            #self.net = self.net.to(self.device)
 
             self.net.train()
             for _, (data, target) in enumerate(self.trainloader, 0):
@@ -253,7 +261,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 if isinstance(data, list):
                     data = data[0]
 
-                data, target = data.to(self.device), target.to(self.device)
+                #data, target = data.to(self.device), target.to(self.device)
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
                 _, predicted = torch.max(outputs.data, 1)

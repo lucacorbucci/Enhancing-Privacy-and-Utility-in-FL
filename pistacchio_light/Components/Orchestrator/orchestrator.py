@@ -25,9 +25,9 @@ logger.add(
 )
 
 def connect_node(node, model, communication_queue):
-    new_node = copy.deepcopy(node)
-    new_node.federated_model = new_node.connect_node(model)
-    communication_queue.put(new_node)
+    #new_node = copy.deepcopy(node)
+    node.connect_node(model)
+    communication_queue.put(node)
     return "OK"
 
 
@@ -37,7 +37,7 @@ def start_train(node):
 
 
 class Orchestrator:
-    def __init__(self, preferences: dict) -> None:
+    def __init__(self, preferences: dict, environment: dict) -> None:
         """Orchestrator is an abstraction object that emulates 
         a classic orchestrator in federated learning. It connects
         to the nodes that are already initialized in the environment
@@ -45,11 +45,15 @@ class Orchestrator:
         
         Args:
             preferences (dict): Preferences for the training.
+            envrionment (dict): Environment of the training. 
         
         Returns:
             None"""
         assert preferences
         self.preferences = preferences
+        self.environment = environment
+        self.pool_size = self.preferences["orchestrator_settings"]["sampling_size"]
+        self.nodes = environment["available_clients"]
     
     def refresh_environment(self, environemt: dict) -> None:
         """Refreshes the envrionment that is simulated 
@@ -91,9 +95,15 @@ class Orchestrator:
         # If the model is not passed as an argument, it will try to
         # load the model given the preferences dictionary.
         if model:
-            self.orchestrator_model = model
+            self.orchestrator_model = FederatedModel(node_name='orchestrator', preferences=self.preferences)
+            self.orchestrator_model.init_model(model, [self.validation_set])
         else:
-            self.orchestrator_model = get_model(self.preferences["model"])                
+            self.model = get_model(self.preferences["model"])
+            self.orchestrator_model = FederatedModel(
+                node_name='orchestrator', 
+                preferences=self.preferences)
+            self.orchestrator_model.init_model(net=self.model, 
+                                               local_dataset=[self.validation_set])
 
         #if self.preferences.wandb:
             #self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
@@ -158,21 +168,20 @@ class Orchestrator:
             provide to client. Number of models must equal number of nodes."""
 
         logger.debug("Connecting available nodes")
-        nodes = self.environment['available_clients']
 
         if models_list:
             raise("Sending models to nodes by providing models_list is not yet implemeneted.")
         # Creating copies of the models to freely modify the weights of each model.
         else:
-            model_list = [copy.deepcopy(self.orchestrator_model) for _ in range(len(nodes))]
+            model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
         
         manager = multiprocess.Manager()
         communication_queue = manager.Queue()
 
-        with multiprocess.Pool(len(nodes)) as pool:
+        with multiprocess.Pool(len(self.nodes)) as pool:
             results = [
                 pool.apply_async(connect_node, (node, model, communication_queue))
-                for node, model in zip(nodes, model_list)
+                for node, model in zip(self.nodes, model_list)
             ]
             self.connected_nodes = []
             for result in results:
@@ -181,6 +190,27 @@ class Orchestrator:
 
         logger.debug("Nodes connected")
         logger.debug(f"A list of nodes connected: {self.connected_nodes}")
+        
+        #TODO: This is a problem I am inspecting. It seems that the memory space of nodes initialized in the
+        # envrionment is different than those connected. I had to make a mistake somewhere.
+        #print(self.connected_nodes)
+        for node in self.connected_nodes:
+            print(node.local_traindata)
+            print(node.local_testdata)
+            print(node.federated_model)
+        #print(self.environment['available_clients'])
+        #for node in self.environment['available_clients']:
+            #print(node.local_traindata)
+            #print(node.local_testdata)
+    
+    def prepare_for_training(self) -> None:
+        """Simple convenience method that allows for
+        a quick setup of the orchestrator instance.
+        All this functionality of this method can be realized
+        by individual calls to the Orchestrator.launch_orchestrator
+        and Orchestrator.connect_nodes methods."""
+        self.launch_orchestrator()
+        self.connect_nodes()
 
     def simple_protocol(
         self,
@@ -189,10 +219,10 @@ class Orchestrator:
 
         with ThreadPool(self.pool_size) as pool:
 
-            for iteration in range(self.iterations):
+            for iteration in range(self.preferences["orchestrator_settings"]["training_rounds"]):
                 logger.info(f"Iterazione {iteration}")
                 weights = {}
-                sampled_nodes = random.sample(self.nodes, self.sampled_nodes)
+                sampled_nodes = random.sample(self.connected_nodes, self.pool_size)
                 results = [
                     pool.apply_async(start_train, (node,)) for node in sampled_nodes
                 ]
@@ -208,12 +238,12 @@ class Orchestrator:
                     weights[node_id] = copy.deepcopy(model_weights.weights)
 
                 avg = Utils.compute_average(weights)
-                for node in self.nodes:
+                for node in self.connected_nodes:
                     node.federated_model.update_weights(avg)
-                self.federated_model.update_weights(avg)
+                self.orchestrator_model.update_weights(avg)
                 
                 logger.debug("Computed the average")
-                self.log_metrics(iteration=iteration)
+                #self.log_metrics(iteration=iteration)
         logger.debug("Training finished")
 
     def log_metrics(self, iteration:int) -> None:

@@ -37,8 +37,6 @@ class FederatedNode:
         Args:
             node_id (str): id of the node
             preferences (dict): preferences dictionary
-            # logging_queue (CommunicationChannel): queue that is used to send back the
-            #     performances of the node to the main thread.
         """
         self.status = 0 # 0 if transaction failed, 1 if successful
         self.federated_model = None
@@ -64,13 +62,12 @@ class FederatedNode:
             FederatedModel: _description_
         """
         self.load_local_data()
-        federated_model: FederatedModel = FederatedModel(
+        self.federated_model = FederatedModel(
             node_name=self.node_id,
             preferences=self.preferences,
         )
-        federated_model.init_model(net=model,
+        self.federated_model.init_model(net=model,
                                    local_dataset=[self.local_traindata, self.local_testdata])
-        return federated_model
     
     def load_local_data(self, 
                         from_disk = True, 
@@ -308,17 +305,15 @@ class FederatedNode:
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
 
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
+        local_epochs = self.preferences["orchestrator_settings"]["local_epochs"]
+        
+        #TODO
+        #differential_private_train = self.preferences.server_config[
+            #"differential_privacy_server"
+        #]
 
         for _ in range(local_epochs):
-            metrics = self.local_training(
-                differential_private_train,
-            )
+            metrics = self.local_training(differential_private_train=False)
             loss_list.append(metrics["loss"])
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
@@ -330,14 +325,3 @@ class FederatedNode:
             sender=self.node_id,
             epsilon=metrics["epsilon"],
         )
-
-        received_weights = self.send_and_receive_weights_with_server(
-            federated_model=federated_model,
-            metrics=metrics,
-            results=results,
-        )
-
-        #Update the weights of the model
-        federated_model.update_weights(received_weights)
-
-        return loss_list, accuracy_list, epsilon_list,
