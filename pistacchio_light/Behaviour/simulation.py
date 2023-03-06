@@ -40,8 +40,8 @@ class manage_simulation:
                                 "min_accuracy": 0.80
                             },
                          "orchestrator_settings":{
-                            "local_epochs": 5,
-                            "training_rounds": 10,
+                            "local_epochs": 1,
+                            "training_rounds": 2,
                             "sampling_size": 2,
                             "differential_privacy_server": False
                             },

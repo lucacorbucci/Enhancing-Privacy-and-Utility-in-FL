@@ -61,4 +61,4 @@ class Manage_Environment:
     
     def initialize_training(self, protocol=None):
         self.environment["orchestrator"].connect_nodes()
-        #self.environment["orchestrator"].simple_protocol()
+        self.environment["orchestrator"].simple_protocol()
