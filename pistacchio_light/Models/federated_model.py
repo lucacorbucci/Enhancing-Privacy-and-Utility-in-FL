@@ -1,5 +1,6 @@
 # Libraries imports
 import sys, warnings, torch, gc
+import numpy as np
 # Modules imports
 from abc import ABC
 from collections import Counter
