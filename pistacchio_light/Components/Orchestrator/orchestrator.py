@@ -35,6 +35,9 @@ def start_train(node):
     weights = node.train_local_model()
     return (node.node_id, weights)
 
+def query_for_results(node):
+    return node.comp
+
 
 class Orchestrator:
     def __init__(self, preferences: dict, environment: dict) -> None:
@@ -103,7 +106,7 @@ class Orchestrator:
                 node_name='orchestrator', 
                 preferences=self.preferences)
             self.orchestrator_model.init_model(net=self.model, 
-                                               local_dataset=[self.validation_set])
+                                               local_dataset=self.validation_set)
 
         #if self.preferences.wandb:
             #self.wandb = Utils.configure_wandb(group="Orchestrator", preferences=self.preferences)
@@ -243,10 +246,10 @@ class Orchestrator:
                 self.orchestrator_model.update_weights(avg)
                 
                 logger.debug("Computed the average")
-                #self.log_metrics(iteration=iteration)
+                self.log_orchestrator_metrics(iteration=iteration)
         logger.debug("Training finished")
 
-    def log_metrics(self, iteration:int) -> None:
+    def log_orchestrator_metrics(self, iteration:int) -> None:
         logger.debug("Computing metrics...")
         (
             loss,
@@ -257,7 +260,7 @@ class Orchestrator:
             test_accuracy_per_class,
             true_positive_rate,
             false_positive_rate
-        ) = self.federated_model.evaluate_model()
+        ) = self.orchestrator_model.evaluate_model()
         metrics = {"loss":loss, 
                     "accuracy": accuracy, 
                     "fscore": fscore, 
@@ -270,6 +273,6 @@ class Orchestrator:
         logger.debug(metrics)
         logger.debug("Metrics computed")
         logger.debug("Logging the metrics on wandb")
-        if self.preferences.wandb:
-            Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
+        #if self.preferences.wandb:
+            #Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
         logger.debug("Metrics logged")

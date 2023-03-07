@@ -87,8 +87,12 @@ class FederatedModel(ABC, Generic[TDestination]):
         """
         if self.node_name != "orchestrator":
             self.trainloader, self.testloader = self.prepare_data(local_dataset)
+            if self.preferences['verbose'] >= 2:
+                print(f"Data of {self.node_name} prepared: {self.trainloader}, {self.testloader}")
         else:
             self.testloader = self.prepare_data(local_dataset)
+            if self.preferences['verbose'] >= 2:
+                print(f"Data of {self.node_name} prepared: {self.testloader}")
 
         self.add_model(net)
         if self.net:
@@ -131,7 +135,8 @@ class FederatedModel(ABC, Generic[TDestination]):
         ------
             Exception: Preference is not initialized
         """
-        if self.preferences and self.node_name != 'orchestrator':
+        assert self.preferences
+        if self.node_name != 'orchestrator':
             batch_size = self.preferences["hyperparameters"]["batch_size"]
             trainloader = torch.utils.data.DataLoader(
                 local_dataset[0],
@@ -150,7 +155,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             return trainloader, testloader
         else:
             testloader = torch.utils.data.DataLoader(
-                local_dataset[0],
+                local_dataset,
                 batch_size=16,
                 shuffle=False,
                 num_workers=0,
@@ -381,7 +386,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 y_true = []
                 losses = []
                 with torch.no_grad():
-                    for data, target in self.testloader:
+                    for _, (data, target) in enumerate(self.testloader, 0):
                         data, target = data.to(self.device), target.to(self.device)
                         output = self.net(data)
                         total += target.size(0)
