@@ -123,8 +123,8 @@
     "server_config": {
         "differential_privacy_server": false,
         "mixed_mode": false,
-        "local_training_epochs_with_server": 1,
-        "num_communication_round_with_server": 30,
+        "local_epochs": 1,
+        "fl_rounds": 30,
         "total_mixed_iterations": 1
     },
     "hyperparameters": {

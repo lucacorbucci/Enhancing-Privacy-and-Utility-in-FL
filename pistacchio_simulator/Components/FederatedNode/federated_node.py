@@ -119,8 +119,6 @@ class FederatedNode:
 
         return federated_model
 
- 
-
     def local_training(
         self,
         differential_private_train: bool,
@@ -179,7 +177,6 @@ class FederatedNode:
 
         return received_weights
 
-    
     def send_performances(self, performances: dict[str, Performances]) -> None:
         """This function is used to send the performances of
         the node to the server.
@@ -218,7 +215,7 @@ class FederatedNode:
         """
         epochs = range(
             1,
-            self.preferences.server_config["num_communication_round_with_server"] + 1,
+            self.preferences.server_config["fl_rounds"] + 1,
         )
 
         performances = {}
@@ -275,7 +272,6 @@ class FederatedNode:
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
         logger.debug(f"Node {self.node_id} started")
 
-     
     def train_local_model(
         self,
         # results: dict | None = None,
@@ -297,9 +293,7 @@ class FederatedNode:
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
 
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
+        local_epochs = self.preferences.server_config["local_epochs"]
         differential_private_train = self.preferences.server_config[
             "differential_privacy_server"
         ]
@@ -312,7 +306,7 @@ class FederatedNode:
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
-        
+
         logger.debug("2")
         return Weights(
             weights=self.federated_model.get_weights(),

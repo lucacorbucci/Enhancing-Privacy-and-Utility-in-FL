@@ -66,8 +66,8 @@ The configuration file is a JSON file that contains all the parameters needed to
 	"server_config": {
 		"differential_privacy_server": false,
 		"mixed_mode": false,
-		"local_training_epochs_with_server": 1,
-		"num_communication_round_with_server": 40,
+		"local_epochs": 1,
+		"fl_rounds": 40,
 		"total_mixed_iterations": 1
 	},
 	"hyperparameters": {
@@ -115,8 +115,8 @@ With the **server_config** parameter we can specify all the parameters related t
 
 -   **differential_privacy_server:** if true, the differential privacy will be applied during the training phase with the server.
 -   **mixed_mode:** if true, the mixed mode will be used during the training phase with the server. This means that we will alternate between training inside the cluster and training with the server.
--   **local_training_epochs_with_server:** the number of local training epochs that we want to perform on each client before sharing the model with the server.
--   **num_communication_round_with_server:** the number of communication rounds (exchanges of model weights) that we want to perform during the training phase with the server.
+-   **local_epochs:** the number of local training epochs that we want to perform on each client before sharing the model with the server.
+-   **fl_rounds:** the number of communication rounds (exchanges of model weights) that we want to perform during the training phase with the server.
 -   **total_mixed_iterations:** the number of times we want to perform the mixed mode phase with the server. For instance if we set this to 10, we will alternate between training inside the cluster and training with the server for 10 times.
 
 With the **hyperparameters** parameter we can specify all the parameters related to the hyperparameters:

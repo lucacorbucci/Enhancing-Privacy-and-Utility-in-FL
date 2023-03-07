@@ -1,24 +1,25 @@
 {
-    "dataset": "mnist",
+    "dataset": "cifar10",
     "mode": "classic",
-    "task": "contribution",
+    "task": "federatedlearning",
     "debug": true,
     "save_model": false,
     "federated": true,
-    "wandb": true,
+    "wandb": false,
     "data_split_config": {
         "split_type": "stratified",
         "num_classes": 10,
         "num_nodes": 1,
-        "num_clusters": 5,
+        "num_clusters": 10,
         "noniid_nodes_distribution": false,
+        "num_classes_per_cluster": 10,
         "server_validation_set": "server_validation_split"
     },
     "server_config": {
-        "differential_privacy_server": false,
+        "differential_privacy_server": true,
         "mixed_mode": false,
-        "local_epochs": 1,
-        "fl_rounds": 2,
+        "local_epochs": 5,
+        "fl_rounds": 200,
         "total_mixed_iterations": 1,
         "server_pre_training": false,
         "server_pre_training_dataset": "server_validation_split"
@@ -28,7 +29,7 @@
         "lr": 0.001,
         "MAX_PHYSICAL_BATCH_SIZE": 128,
         "DELTA": 1e-5,
-        "noise_multiplier": 0.5,
+        "noise_multiplier": 0.8,
         "max_grad_norm": 1.2,
         "weight_decay": 0,
         "min_improvement": 0.001,
@@ -36,8 +37,7 @@
         "min_accuracy": 0.80
     },
     "gpu_config": [
-        "cuda:5",
-        "cuda:5"
-    ],
-    "wandb_project": "contribution"
+        "cuda:6",
+        "cuda:6"
+    ]
 }

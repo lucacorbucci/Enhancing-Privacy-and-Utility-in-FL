@@ -37,8 +37,8 @@
     "server_config": {
         "differential_privacy_server": false,
         "mixed_mode": true,
-        "local_training_epochs_with_server": 1,
-        "num_communication_round_with_server": 1,
+        "local_epochs": 1,
+        "fl_rounds": 1,
         "total_mixed_iterations": 1
     },
     "hyperparameters": {

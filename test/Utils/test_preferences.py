@@ -41,8 +41,8 @@ preferences_mnist = {
     "server_config": {
         "differential_privacy_server": True,
         "mixed_mode": False,
-        "local_training_epochs_with_server": 1,
-        "num_communication_round_with_server": 1,
+        "local_epochs": 1,
+        "fl_rounds": 1,
         "total_mixed_iterations": 1,
     },
     "hyperparameters": {
@@ -158,7 +158,7 @@ class TestPreferences:
         assert preferences.server_config == {
             "differential_privacy_server": True,
             "mixed_mode": False,
-            "local_training_epochs_with_server": 1,
-            "num_communication_round_with_server": 1,
+            "local_epochs": 1,
+            "fl_rounds": 1,
             "total_mixed_iterations": 1,
         }

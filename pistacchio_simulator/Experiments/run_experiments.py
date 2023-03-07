@@ -1,18 +1,19 @@
+from multiprocessing import set_start_method
+
 import torch
 from torch import nn
 
 from pistacchio_simulator.Components.Orchestrator.orchestrator import Orchestrator
 from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
 from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
+from pistacchio_simulator.Models.cifar import CifarNet
 from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task, TaskType
-from multiprocessing import set_start_method
 
 
 class Experiment:
-
     @staticmethod
     def get_model(preferences: Preferences) -> nn.Module:
         """This function is used to get the model.
@@ -25,8 +26,7 @@ class Experiment:
         if preferences.dataset_name == "mnist":
             model = MnistNet()
         elif preferences.dataset_name == "cifar10":
-            model = Experiment.get_model_to_fine_tune()
-            preferences.fine_tuning = True
+            model = CifarNet()
         elif preferences.dataset_name == "celeba":
             model = CelebaNet()
         elif preferences.dataset_name == "celeba_gender":
@@ -48,27 +48,27 @@ class Experiment:
             preferences (Preferences): _description_
         """
         model = Experiment.get_model(preferences)
-        
+
         orchestrator = Orchestrator(
             preferences=preferences,
             model=model,
         )
         orchestrator.launch_orchestrator()
-    
 
     @staticmethod
     def run_contribution_experiment(preferences: Preferences) -> None:
-        iterations = preferences.data_split_config["num_clusters"]*preferences.data_split_config["num_nodes"]+1
+        iterations = (
+            preferences.data_split_config["num_clusters"]
+            * preferences.data_split_config["num_nodes"]
+            + 1
+        )
         for iteration in range(iterations):
             model = Experiment.get_model(preferences)
-            
+
             orchestrator = Orchestrator(
-                preferences=preferences,
-                model=model,
-                iteration=iteration
+                preferences=preferences, model=model, iteration=iteration
             )
             orchestrator.launch_orchestrator()
-
 
     @staticmethod
     def run_fairness_experiment(preferences: Preferences) -> None:

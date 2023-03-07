@@ -5,10 +5,12 @@ from collections import OrderedDict
 import pytest
 import torch
 
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
+
 
 preferences = Preferences(
     dataset_name="mnist",
@@ -30,7 +32,7 @@ preferences = Preferences(
     },
     server_config={
         "differential_privacy_server": False,
-        "num_communication_round_with_server": 1,
+        "fl_rounds": 1,
     },
     hyperparameters={
         "batch_size": 32,

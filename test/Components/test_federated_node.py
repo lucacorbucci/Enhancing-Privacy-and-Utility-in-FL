@@ -7,7 +7,6 @@ import pytest
 import torch
 from torch import nn
 
-
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
@@ -16,7 +15,6 @@ from pistacchio_simulator.DataSplit.storage_manager import StorageManager
 from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task
-
 
 preferences = Preferences(
     dataset_name="mnist",
@@ -38,7 +36,7 @@ preferences = Preferences(
     },
     server_config={
         "differential_privacy_server": False,
-        "num_communication_round_with_server": 1,
+        "fl_rounds": 1,
     },
     hyperparameters={
         "batch_size": 32,

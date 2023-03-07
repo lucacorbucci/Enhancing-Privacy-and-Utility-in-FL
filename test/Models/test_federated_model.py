@@ -8,7 +8,6 @@ import torch
 from opacus.grad_sample.grad_sample_module import GradSampleModule
 from torch import Tensor, nn, optim
 
-
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
@@ -22,7 +21,6 @@ from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task
-
 
 preferences_mnist = Preferences(
     dataset_name="mnist",
@@ -44,7 +42,7 @@ preferences_mnist = Preferences(
     },
     server_config={
         "diff_privacy_server": False,
-        "num_communication_round_with_server": 1,
+        "fl_rounds": 1,
     },
     hyperparameters={
         "batch_size": 32,
@@ -81,7 +79,7 @@ preferences_cifar = Preferences(
     },
     server_config={
         "diff_privacy_server": False,
-        "num_communication_round_with_server": 1,
+        "fl_rounds": 1,
     },
     hyperparameters={
         "batch_size": 32,
@@ -118,7 +116,7 @@ preferences_cifar_epsilon = Preferences(
     },
     server_config={
         "diff_privacy_server": False,
-        "num_communication_round_with_server": 1,
+        "fl_rounds": 1,
     },
     hyperparameters={
         "batch_size": 32,

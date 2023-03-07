@@ -21,7 +21,7 @@ class Preferences:
         p2p_config: dict | None = None,
         gpu_config: list | None = None,
         wandb_tags: list | None = ["experiment"],
-        wandb_project: str = "project"
+        wandb_project: str = "project",
     ) -> None:
         """Initialization of the class Preferences.
 
@@ -33,19 +33,26 @@ class Preferences:
             save_model (bool): true if we want to save the model
             hyperparameters (dict): a dictionary containing the hyperparameters
                 we want to use during training
-            data_split_config (dict): a dictionary containing the configuration for the data split
+            data_split_config (dict): a dictionary containing
+                the configuration for the data split
             wandb (bool): true if we want to use wandb
-            server_config (Optional[dict], optional): The configuration we want to use
-                for the server. Defaults to None.
-            p2p_config (Optional[dict], optional): The configuration we want to use
-                during the P2P phase. Defaults to None.
-            gpu_config (Optional[list], optional): This paramter is used to configure the GPU that we want to use. For instance if we assign ["cuda_0", "cuda_1"] we will use two GPUs and we will split the clients on them. Defaults to None.
-            wandb_tags (Optional[list], optional): a list of tags we want to use on
+            server_config (Optional[dict], optional): The configuration we
+                want to use for the server. Defaults to None.
+            p2p_config (Optional[dict], optional): The configuration we want
+                to use during the P2P phase. Defaults to None.
+            gpu_config (Optional[list], optional): This paramter is used
+                to configure the GPU that we want to use.
+                For instance if we assign ["cuda_0", "cuda_1"] we will use
+                two GPUs and we will split the clients on them.
+                Defaults to None.
+            wandb_tags (Optional[list], optional): a list of tags we
+                want to use on
             wandb. Defaults to ["experiment"].
 
         Raises
-            MissingConfigurationError: This exception is raised when you try to use a configuration
-                without at least one among server_config and p2p_config.
+            MissingConfigurationError: This exception is raised when you
+                try to use a configuration without at least
+                one among server_config and p2p_config.
         """
         if not server_config and not p2p_config:
             raise MissingConfigurationError
@@ -70,7 +77,8 @@ class Preferences:
 
     @staticmethod
     def generate_from_json(data: dict) -> "Preferences":
-        """This method is used to generate a Preferences object from a json file.
+        """This method is used to generate a Preferences
+        object from a json file.
 
         Args:
             data (_type_): json file
@@ -92,5 +100,5 @@ class Preferences:
             server_config=data.get("server_config", None),
             gpu_config=data.get("gpu_config", None),  # ["cuda:0", "cuda:1"]
             wandb_tags=data.get("wandb_tags", ["experiment"]),
-            wandb_project=data.get("wandb_project", "project")
+            wandb_project=data.get("wandb_project", "project"),
         )
