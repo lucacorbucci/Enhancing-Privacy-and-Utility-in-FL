@@ -1,5 +1,5 @@
 {
-    "dataset": "mnist",
+    "dataset": "fair_face",
     "mode": "classic",
     "task": "federatedlearning",
     "debug": true,
@@ -7,13 +7,15 @@
     "federated": true,
     "wandb": false,
     "data_split_config": {
-        "split_type": "stratified",
-        "num_classes": 10,
+        "split_type": "random",
+        "num_classes": 2,
+        "tabular": true,
         "num_nodes": 1,
-        "num_clusters": 4,
+        "num_clusters": 2,
         "noniid_nodes_distribution": false,
-        "num_classes_per_cluster": 1000,
-        "server_validation_set": "server_validation_split"
+        "server_validation_set": "server_validation_split",
+        "csv_train": "../data/fair_face/fairface_label_train.csv",
+        "csv_val": "../data/fair_face/fairface_label_val.csv"
     },
     "server_config": {
         "differential_privacy_server": true,

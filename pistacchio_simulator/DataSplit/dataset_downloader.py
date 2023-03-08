@@ -43,6 +43,8 @@ class DatasetDownloader:
             train_ds, test_ds = DatasetDownloader.download_fashion_mnist()
         elif dataset_name == "imaginette":
             train_ds, test_ds = DatasetDownloader.download_imaginette()
+        elif dataset_name == "fair_face":
+            train_ds, test_ds = DatasetDownloader.download_fair_face()
         else:
             raise InvalidDatasetErrorNameError()
         return train_ds, test_ds
@@ -132,16 +134,52 @@ class DatasetDownloader:
             ],
         )
 
-        mnist_train_ds = torchvision.datasets.ImageFolder(
+        imaginette_train_ds = torchvision.datasets.ImageFolder(
             "../data/imaginette/train",
             transform=transform,
         )
 
-        mnist_test_ds = torchvision.datasets.ImageFolder(
+        imaginette_test_ds = torchvision.datasets.ImageFolder(
             "../data/imaginette/val",
             transform=transform,
         )
-        return mnist_train_ds, mnist_test_ds
+        return imaginette_train_ds, imaginette_test_ds
+
+    @staticmethod
+    def download_fair_face() -> tuple[
+        torchvision.datasets.ImageFolder,
+        torchvision.datasets.ImageFolder,
+    ]:
+        """This function downloads the fair_face dataset.
+
+        Returns
+        -------
+            Tuple[torchvision.datasets.ImageFolder, torchvision.datasets.ImageFolder]:
+            the train and test dataset
+        """
+        transform = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225],
+                ),
+            ],
+        )
+        print("OK 1")
+        fair_face_train_ds = torchvision.datasets.ImageFolder(
+            "../data/fair_face/train_data",
+            transform=transform,
+        )
+
+        fair_face_test_ds = torchvision.datasets.ImageFolder(
+            "../data/fair_face/val_data",
+            transform=transform,
+        )
+        print("OK")
+        return fair_face_train_ds, fair_face_test_ds
 
     @staticmethod
     def download_celeba() -> tuple[

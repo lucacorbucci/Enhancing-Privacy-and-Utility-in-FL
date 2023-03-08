@@ -37,13 +37,13 @@ class Utils:
         for model in models:
             for key in model:
                 if results.get(key) is None:
-                    if torch.cuda.is_available():
-                        model[key] = model[key].to("cuda:0")
+                    # if torch.cuda.is_available():
+                    #     model[key] = model[key].to("cuda:0")
 
                     results[key] = model[key]
                 else:
-                    if torch.cuda.is_available():
-                        model[key] = model[key].to("cuda:0")
+                    # if torch.cuda.is_available():
+                    #     model[key] = model[key].to("cuda:0")
                     results[key] = results[key].add(model[key])
 
         for key in results:
@@ -187,10 +187,7 @@ class Utils:
             wandb_run.log_artifact(artifact)
 
     @staticmethod
-    def log_metrics_to_wandb(
-        wandb_run: ModuleType,
-        metrics: dict
-    ) -> None:
+    def log_metrics_to_wandb(wandb_run: ModuleType, metrics: dict) -> None:
         """Log metrics to wandb.
 
         Args:

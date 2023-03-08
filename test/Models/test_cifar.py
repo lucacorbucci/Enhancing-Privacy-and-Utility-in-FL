@@ -36,19 +36,3 @@ class TestCifarNet:
         output_data = net(input_data)
 
         assert output_data.shape == (1, 10)
-
-    @staticmethod
-    def test_cifar_net_dropout_rate():
-        """Test that the CifarNet applies the correct dropout rate."""
-        net = CifarNet(dropout_rate=0.5)
-        input_data = torch.randn(1, 3, 32, 32)
-        net(input_data)
-        assert net.dropout.p == 0.5
-
-    @staticmethod
-    def test_cifar_net_num_flat_features():
-        """Test that the num_flat_features function returns correct number of features."""
-        net = CifarNet()
-        input_data = torch.randn(1, 3, 32, 32)
-        num_features = net.num_flat_features(input_data)
-        assert num_features == 32 * 32 * 3

@@ -5,7 +5,7 @@ description = "A simulator framework for Federated Learning for research purpose
 authors = ["Luca Corbucci"]
 license = "MIT"
 readme = "README.md"
-packages = [ { include = "pistacchio-simulator" } ]
+packages = [ { include = "pistacchio_simulator" } ]
 
 [tool.poetry.dependencies]
 python = "^3.10"

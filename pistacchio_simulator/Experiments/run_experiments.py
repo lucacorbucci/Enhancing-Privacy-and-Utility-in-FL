@@ -1,16 +1,16 @@
 from multiprocessing import set_start_method
 
 import torch
-from torch import nn
-
 from pistacchio_simulator.Components.Orchestrator.orchestrator import Orchestrator
 from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
 from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
-from pistacchio_simulator.Models.cifar import CifarNet
+from pistacchio_simulator.Models.fair_face import FairFace
 from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.imaginette import Imaginette
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task, TaskType
+from torch import nn
 
 
 class Experiment:
@@ -26,7 +26,8 @@ class Experiment:
         if preferences.dataset_name == "mnist":
             model = MnistNet()
         elif preferences.dataset_name == "cifar10":
-            model = CifarNet()
+            model = Experiment.get_model_to_fine_tune()
+            preferences.fine_tuning = True
         elif preferences.dataset_name == "celeba":
             model = CelebaNet()
         elif preferences.dataset_name == "celeba_gender":
@@ -34,7 +35,10 @@ class Experiment:
         elif preferences.dataset_name == "fashion_mnist":
             model = FashionMnistNet()
         elif preferences.dataset_name == "imaginette":
-            model = Experiment.get_model_to_fine_tune()
+            model = Imaginette().get_model_to_fine_tune()
+            preferences.fine_tuning = True
+        elif preferences.dataset_name == "fair_face":
+            model = FairFace.get_model_to_fine_tune()
             preferences.fine_tuning = True
         else:
             raise InvalidDatasetErrorNameError("Invalid dataset name")

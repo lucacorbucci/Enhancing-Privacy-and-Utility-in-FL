@@ -54,9 +54,9 @@ class Orchestrator:
             preferences.data_split_config["num_nodes"]
             * preferences.data_split_config["num_clusters"]
         )
-        self.pool_size = 30
+        self.pool_size = 2
         self.iterations = 4
-        self.sampled_nodes = 100
+        self.sampled_nodes = 2
         self.iteration = iteration
 
     def launch_orchestrator(self) -> None:
@@ -97,7 +97,7 @@ class Orchestrator:
 
         # If we are performing the contribution analysis
         # we have to remove one node from the list of nodes
-        if self.iteration > 0:
+        if self.iteration and self.iteration > 0:
             nodes.pop(self.iteration - 1)
             self.preferences.removed_node_id = self.iteration
 
