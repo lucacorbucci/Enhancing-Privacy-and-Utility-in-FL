@@ -12,7 +12,6 @@ from multiprocessing import set_start_method
 
 
 class Experiment:
-
     @staticmethod
     def get_model(preferences: Preferences) -> nn.Module:
         """This function is used to get the model.
@@ -48,27 +47,27 @@ class Experiment:
             preferences (Preferences): _description_
         """
         model = Experiment.get_model(preferences)
-        
+
         orchestrator = Orchestrator(
             preferences=preferences,
             model=model,
         )
         orchestrator.launch_orchestrator()
-    
 
     @staticmethod
     def run_contribution_experiment(preferences: Preferences) -> None:
-        iterations = preferences.data_split_config["num_clusters"]*preferences.data_split_config["num_nodes"]+1
+        iterations = (
+            preferences.data_split_config["num_clusters"]
+            * preferences.data_split_config["num_nodes"]
+            + 1
+        )
         for iteration in range(iterations):
             model = Experiment.get_model(preferences)
-            
+
             orchestrator = Orchestrator(
-                preferences=preferences,
-                model=model,
-                iteration=iteration
+                preferences=preferences, model=model, iteration=iteration
             )
             orchestrator.launch_orchestrator()
-
 
     @staticmethod
     def run_fairness_experiment(preferences: Preferences) -> None:

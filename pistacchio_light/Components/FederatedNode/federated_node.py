@@ -1,18 +1,18 @@
-import sys
-import time
+import sys, time, os, dill
 from typing import Any, Mapping, TypeVar
 
 from loguru import logger
 from torch import Tensor, nn
+from torch.utils.data import DataLoader
 
-from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
-from pistacchio_simulator.Models.federated_model import FederatedModel
-from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
-from pistacchio_simulator.Utils.end_messages import Message
-from pistacchio_simulator.Utils.performances import Performances
-from pistacchio_simulator.Utils.phases import Phase
-from pistacchio_simulator.Utils.preferences import Preferences
-from pistacchio_simulator.Utils.weights import Weights
+from pistacchio_light.Exceptions.errors import NotYetInitializedServerChannelError
+from pistacchio_light.Models.federated_model import FederatedModel
+from pistacchio_light.Utils.communication_channel import CommunicationChannel
+from pistacchio_light.Utils.end_messages import Message
+from pistacchio_light.Utils.performances import Performances
+from pistacchio_light.Utils.phases import Phase
+from pistacchio_light.Utils.preferences import Preferences
+from pistacchio_light.Utils.weights import Weights
 
 
 logger.remove()
@@ -22,62 +22,94 @@ logger.add(
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
 )
 
-TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
+# TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
 
 
 class FederatedNode:
-    """FederatedNode is the component that can be used for the
-    classic Federated Learning.
-    It trains the model locally and then sends the weights to the server.
-    """
-
     def __init__(
         self,
         node_id: str,
-        preferences: Preferences,
-        # server_channel: CommunicationChannel,
-        # logging_queue: CommunicationChannel,
-        # receiver_channel: CommunicationChannel | None = None,
-    ) -> None:
-        """Init the Federated Node.
-
+        preferences: dict,
+    ) -> int:
+        """FederatedNode is the component that can serve as an abstraction
+            class for creating one federated node. It is a classic federated node
+            that serves as an individual client that has joined the network.
         Args:
             node_id (str): id of the node
-            preferences (Preferences): preferences object of the node that contains
-                all the preferences for this node
-            # logging_queue (CommunicationChannel): queue that is used to send back the
-            #     performances of the node to the main thread.
+            preferences (dict): preferences dictionary
         """
-        self.node_id = node_id
-        # self.logging_queue = logging_queue
-        self.preferences = preferences
-        self.mode = "federated"
-        # self.receiver_channel = (
-        #     receiver_channel if receiver_channel else CommunicationChannel(name=node_id)
-        # )
-        self.mixed = False
-        self.message_counter = 0
-        # self.server_channel: CommunicationChannel | None = None
+        self.status = 0  # 0 if transaction failed, 1 if successful
         self.federated_model = None
+        self.message_counter = 0
+        self.mixed = False
+        try:
+            self.preferences = preferences
+            self.mode = "federated"
+            self.node_id = node_id
+            self.status = 1
+            logger.info(f"Node {self.node_id} initialized")
+        except:
+            logger.warning(f"Initialization of node {node_id} failed.")
 
-    # def receive_data_from_server(self) -> Any:
-    #     """This function receives the weights from the server.
-    #     If the weights are not received, it returns an error message
-    #     otherwise it returns the weights.
+    def connect_node(self, model: nn.Module) -> FederatedModel:
+        """Initialize the federated learning model.
 
-    #     Returns
-    #     -------
-    #         Union[Weights, None]: Weights received from the server
-    #     """
-    #     try:
-    #         received_data = self.receiver_channel.receive_data()
-    #         return (
-    #             received_data
-    #             if received_data == Message.STOP
-    #             else received_data.weights
-    #         )
-    #     except (ValueError, AttributeError):
-    #         return Message.ERROR
+        Args:
+            model (_type_): _description_
+
+        Returns
+        -------
+            FederatedModel: _description_
+        """
+        self.load_local_data()
+        self.federated_model = FederatedModel(
+            node_name=self.node_id,
+            preferences=self.preferences,
+        )
+        self.federated_model.init_model(
+            net=model, local_dataset=[self.local_traindata, self.local_testdata]
+        )
+
+    def load_local_data(self, from_disk=True, data=None) -> None:
+        self.status = 0
+        if from_disk:
+            logger.info(f"Node {self.node_id} is trying to load it's data")
+            try:
+                trn_path = os.path.join(
+                    os.getcwd(),
+                    f"generated_datasets",
+                    self.preferences["dataset"],
+                    self.preferences["task_specification"],
+                    "train_set",
+                    f"{self.node_id}_cluster_0",
+                )
+                tst_path = os.path.join(
+                    os.getcwd(),
+                    f"generated_datasets",
+                    self.preferences["dataset"],
+                    self.preferences["task_specification"],
+                    "test_set",
+                    f"{self.node_id}_cluster_0",
+                )
+                with open(trn_path, "rb") as file:
+                    self.local_traindata = dill.load(file)
+                with open(tst_path, "rb") as file:
+                    self.local_testdata = dill.load(file)
+                self.status = 1
+            except:
+                logger.warning(
+                    f"An error occured, {self.node_id} failed to load the data."
+                )
+        else:
+            logger.info(f"Node {self.node_id} is trying to load the passed dataset")
+            try:
+                self.local_traindata = data[0]
+                self.local_testdata = data[1]
+                self.status = 1
+            except:
+                logger.warning(
+                    f"An error occured, {self.node_id} failed to load the data."
+                )
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -99,25 +131,6 @@ class FederatedNode:
             server_channel (_type_): server channel
         """
         self.server_channel = server_channel
-
-    def init_federated_model(self, model: nn.Module) -> FederatedModel:
-        """Initialize the federated learning model.
-
-        Args:
-            model (_type_): _description_
-
-        Returns
-        -------
-            FederatedModel: _description_
-        """
-        federated_model: FederatedModel = FederatedModel(
-            dataset_name=self.preferences.dataset_name,
-            node_name=self.node_id,
-            preferences=self.preferences,
-        )
-        federated_model.init_model(net=model)
-
-        return federated_model
 
     def local_training(
         self,
@@ -259,17 +272,17 @@ class FederatedNode:
         """
         logger.debug(f"Starting node {self.node_id}")
         self.federated_model = self.init_federated_model(model)
+
         # self.receive_starting_model_from_server(federated_model=federated_model)
         # logger.debug(f"Node {self.node_id} received starting model from server")
-
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
-
+        # differential_private_train = self.preferences.server_config[
+        # "differential_privacy_server"
+        # ]
         # Initialize differential privacy if needed
         # if differential_private_train:
         #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
+
         logger.debug(f"Node {self.node_id} started")
 
     def train_local_model(
@@ -293,17 +306,15 @@ class FederatedNode:
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
 
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
+        local_epochs = self.preferences["orchestrator_settings"]["local_epochs"]
+
+        # TODO
+        # differential_private_train = self.preferences.server_config[
+        # "differential_privacy_server"
+        # ]
 
         for _ in range(local_epochs):
-            metrics = self.local_training(
-                differential_private_train,
-            )
+            metrics = self.local_training(differential_private_train=False)
             loss_list.append(metrics["loss"])
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
@@ -315,14 +326,3 @@ class FederatedNode:
             sender=self.node_id,
             epsilon=metrics["epsilon"],
         )
-
-        # received_weights = self.send_and_receive_weights_with_server(
-        #     federated_model=federated_model,
-        #     metrics=metrics,
-        #     results=results,
-        # )
-
-        # Update the weights of the model
-        # federated_model.update_weights(received_weights)
-
-        # return loss_list, accuracy_list, epsilon_list,

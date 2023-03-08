@@ -1,18 +1,16 @@
 """This file is used to generate the dataset for the experiments."""
+# # Libraries import
+import argparse, json, os, sys
 
-# TODO: Refactoring this file
-
-import argparse
-import json
-import sys
+# Modules import
 from collections import Counter
-
 from loguru import logger
 
-from pistacchio_simulator.DataSplit.data_split import DataSplit
-from pistacchio_simulator.DataSplit.dataset_downloader import DatasetDownloader
-from pistacchio_simulator.DataSplit.storage_manager import StorageManager
-from pistacchio_simulator.Exceptions.errors import InvalidSplitTypeError
+# Cross-library imports
+from pistacchio_light.DataSplit.data_split import DataSplit
+from pistacchio_light.DataSplit.dataset_downloader import DatasetDownloader
+from pistacchio_light.DataSplit.storage_manager import StorageManager
+from pistacchio_light.Exceptions.errors import InvalidSplitTypeError
 from pistacchio_simulator.Utils.preferences import Preferences
 
 
@@ -427,53 +425,21 @@ def generate_splitted_dataset(config: Preferences, custom_dataset: dict = None) 
         )
     else:
         raise InvalidSplitTypeError
-
-    # type(cluster_datasets) -> <class 'list'>, a list containg datasets of clients
-    #   len(cluster_datasets) == clients.
-
-    # type(cluster_datasets[500]) -> <class 'torch.utils.data.dataset.Subset'>, dataset of client i
-    #   len(cluster_datasets[500]) == len(dataset) / clients
-
-    # type(cluster_datasets[500][0]) -> <class 'tuple'>
-    #   len(cluster_datasets[500][0]) == 2
-
-    # type(cluster_datasets[500][0][0])) -> <class 'torch.Tensor'>
-    #   cluster_datasets[500][0][0].shape == torch.Size([x, y, z])
-    # type(cluster_datasets[500][0][1])) == <class 'int'>, label of the target
-
     print_debug(counters)
     print_debug(counters_test)
     store_on_disk(config, cluster_datasets, cluster_datasets_test, test_ds, names)
 
 
-def main() -> None:
-    """Based on the preferences, this function generates the dataset.
+class Dataset_Manager:
+    def __init__(self) -> None:
+        """Data storage is a class that can be used to download, transfer and save to disk
+        data that can be used during the experiments with federated learning.
+        Similarly to other classes in pistacchio_light, it can accept either preferences
+        object (retrieved from json) or configuration dictionary"""
 
-    Raises
-    ------
-        InvalidSplitTypeError: If the split type is not valid
-    """
-    parser = argparse.ArgumentParser(description="Hierarchical Federated Learning")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="",
-        metavar="N",
-        help="Config file",
-    )
-    args = parser.parse_args()
-    config = None
-    with open(args.config, encoding="utf-8") as file:
-        config = json.load(file)
-    config = Preferences.generate_from_json(config)
-
-    generate_splitted_dataset(config=config)
-
-
-if __name__ == "__main__":
-    main()
-    main()
-    main()
-    main()
-    main()
-    main()
+    def configure_dataset(self, json_settup):
+        path = os.path.join("DatasetConfigurations", json_settup)
+        with open(path, "r", encoding="utf-8") as file:
+            config = json.load(file)
+            config = Preferences.generate_from_json(config)
+            generate_splitted_dataset(config=config)

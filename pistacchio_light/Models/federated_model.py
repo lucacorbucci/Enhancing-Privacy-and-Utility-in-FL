@@ -1,26 +1,27 @@
-import sys
-import warnings
+# Libraries imports
+import sys, warnings, torch, gc
+import numpy as np
+
+# Modules imports
 from abc import ABC
 from collections import Counter
 from typing import Any, Generic, Mapping, TypeVar
-
-import numpy as np
-import torch
 from loguru import logger
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from torch import nn, optim
-import gc
-from pistacchio_simulator.Exceptions.errors import (
+
+# Cross-library imports
+from pistacchio_light.Exceptions.errors import (
     InvalidDatasetError,
     NotYetInitializedFederatedLearningError,
     NotYetInitializedPreferencesError,
 )
-from pistacchio_simulator.Utils.data_loader import DataLoader
-from pistacchio_simulator.Utils.phases import Phase
-from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_light.Utils.data_loader import DataLoader
+from pistacchio_light.Utils.phases import Phase
+from pistacchio_light.Utils.preferences import Preferences
 
 
 warnings.filterwarnings("ignore")
@@ -44,61 +45,58 @@ class FederatedModel(ABC, Generic[TDestination]):
 
     def __init__(
         self,
-        dataset_name: str,
         node_name: str,
-        preferences: Preferences | None = None,
+        preferences: dict,
     ) -> None:
-        """Initialize the Federated Model.
+        """Initialize the Federated Model. This model will be attached to a
+        specific client and will wait for further instructions. Note that
+        sole initialization will not load the data or model yet, it must be
+        initialized separately by calling init_model function.
 
         Args:
-            dataset_name (str): Name of the dataset we want to use
             node_name (str): name of the node we are working on
-            preferences (Preferences, optional): Configuration for this run. Defaults to None.
-
-        Raises
-        ------
-            InvalidDatasetErrorNameError: _description_
+            preferences (dict): Configuration for this run.
         """
         self.device = None
         self.optimizer: optim.Optimizer = None
-        self.dataset_name = dataset_name
-        self.node_name = node_name
         self.mixed = False
         self.privacy_engine = None
-        if node_name != "server":
-            try:
-                self.training_set = DataLoader().load_splitted_dataset_train(
-                    f"../data/{dataset_name}/federated_split/train_set/{self.node_name}_split",
-                )
-                self.test_set = DataLoader().load_splitted_dataset_test(
-                    f"../data/{dataset_name}/federated_split/test_set/{self.node_name}_split",
-                )
-            except Exception as error:
-                raise InvalidDatasetError from error
-        self.trainloader = None
-        self.testloader = None
         self.preferences = preferences
         self.diff_privacy_initialized = False
-        gpus = preferences.gpu_config
-        expected_len = 11
-        if len(node_name) == expected_len:
-            if gpus:
-                gpu_name = gpus[int(node_name[10]) % len(gpus)]
-            self.device = torch.device(
-                gpu_name if torch.cuda.is_available() and gpus else "cpu",
-            )
-            logger.debug(f"Running on {self.device}")
+        self.node_name = node_name
+
+        # TODO: Add support for training on different GPUs.
+        # gpus = preferences.gpu_config
+        # expected_len = 11
+        # if len(node_name) == expected_len:
+        # if gpus:
+        # gpu_name = gpus[int(node_name[10]) % len(gpus)]
+        # self.device = torch.device(
+        # gpu_name if torch.cuda.is_available() and gpus else "cpu",
+        # )
+        # logger.debug(f"Running on {self.device}")
 
         self.net = None
 
-    def init_model(self, net: nn.Module) -> None:
+    def init_model(self, net: nn.Module, local_dataset: list) -> None:
         """Initialize the Federated Model before the use of it.
+        This method prepares the dataset and model to be used on an
+        already deployed client.
 
         Args:
             net (nn.Module): model we want to use
+            local_daset (list): python list of format: [train_dataset, test_dataset]
         """
-        if not self.trainloader and not self.testloader and self.node_name != "server":
-            self.trainloader, self.testloader = self.load_data()
+        if self.node_name != "orchestrator":
+            self.trainloader, self.testloader = self.prepare_data(local_dataset)
+            if self.preferences["verbose"] >= 2:
+                print(
+                    f"Data of {self.node_name} prepared: {self.trainloader}, {self.testloader}"
+                )
+        else:
+            self.testloader = self.prepare_data(local_dataset)
+            if self.preferences["verbose"] >= 2:
+                print(f"Data of {self.node_name} prepared: {self.testloader}")
 
         self.add_model(net)
         if self.net:
@@ -112,7 +110,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             # self.optimizer = torch.optim.SGD(
             self.optimizer = optim.RMSprop(
                 params_to_update,
-                lr=self.preferences.hyperparameters["lr"],
+                lr=self.preferences["hyperparameters"]["lr"],
             )
 
     def add_model(self, model: nn.Module) -> None:
@@ -126,10 +124,11 @@ class FederatedModel(ABC, Generic[TDestination]):
         if not ModuleValidator.is_valid(model):
             model = ModuleValidator.fix(model)
 
-    def load_data(
-        self,
+    def prepare_data(
+        self, local_dataset=list
     ) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
-        """Load training and test dataset.
+        """Convert training and test data stored on the local client into
+        torch.utils.data.DataLoader..
 
         Returns
         -------
@@ -139,27 +138,32 @@ class FederatedModel(ABC, Generic[TDestination]):
         ------
             Exception: Preference is not initialized
         """
-        if self.preferences:
-            batch_size = self.preferences.hyperparameters["batch_size"]
+        assert self.preferences
+        if self.node_name != "orchestrator":
+            batch_size = self.preferences["hyperparameters"]["batch_size"]
             trainloader = torch.utils.data.DataLoader(
-                self.training_set,
-                batch_size=16,
+                local_dataset[0],
+                batch_size=batch_size,
                 shuffle=True,
                 num_workers=0,
             )
 
             testloader = torch.utils.data.DataLoader(
-                self.test_set,
+                local_dataset[1],
                 batch_size=16,
                 shuffle=False,
                 num_workers=0,
             )
-
-            if self.preferences and self.preferences.debug:
-                self.print_data_stats(trainloader)
+            # self.print_data_stats(trainloader)
             return trainloader, testloader
-
-        raise NotYetInitializedPreferencesError
+        else:
+            testloader = torch.utils.data.DataLoader(
+                local_dataset,
+                batch_size=16,
+                shuffle=False,
+                num_workers=0,
+            )
+            return testloader
 
     def print_data_stats(self, trainloader: torch.utils.data.DataLoader) -> None:
         """Debug function used to print stats about the loaded datasets.
@@ -256,7 +260,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             running_loss = 0.0
             total_correct = 0
             total = 0
-            self.net = self.net.to(self.device)
+            # self.net = self.net.to(self.device)
 
             self.net.train()
             for _, (data, target) in enumerate(self.trainloader, 0):
@@ -266,7 +270,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 if isinstance(data, list):
                     data = data[0]
 
-                data, target = data.to(self.device), target.to(self.device)
+                # data, target = data.to(self.device), target.to(self.device)
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
                 _, predicted = torch.max(outputs.data, 1)
@@ -384,7 +388,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 y_true = []
                 losses = []
                 with torch.no_grad():
-                    for data, target in self.testloader:
+                    for _, (data, target) in enumerate(self.testloader, 0):
                         data, target = data.to(self.device), target.to(self.device)
                         output = self.net(data)
                         total += target.size(0)
