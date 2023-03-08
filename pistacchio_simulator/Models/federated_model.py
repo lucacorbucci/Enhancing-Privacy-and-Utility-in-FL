@@ -283,10 +283,9 @@ class FederatedModel(ABC, Generic[TDestination]):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.net.zero_grad()
-        
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-
 
             loss = running_loss / len(self.trainloader)
             accuracy = total_correct / total
@@ -415,23 +414,27 @@ class FederatedModel(ABC, Generic[TDestination]):
 
                 false_positives = []
                 for i in range(num_classes):
-                    false_positives.append(sum(cm[:,i]) - cm[i,i])
+                    false_positives.append(sum(cm[:, i]) - cm[i, i])
 
                 false_negatives = []
                 for i in range(num_classes):
-                    false_negatives.append(sum(cm[i,:]) - cm[i,i])
+                    false_negatives.append(sum(cm[i, :]) - cm[i, i])
 
                 true_negatives = []
                 for i in range(num_classes):
-                    temp = np.delete(cm, i, 0)   # delete ith row
+                    temp = np.delete(cm, i, 0)  # delete ith row
                     temp = np.delete(temp, i, 1)  # delete ith column
                     true_negatives.append(sum(sum(temp)))
 
                 denominator = [sum(x) for x in zip(false_positives, true_negatives)]
-                false_positive_rate = [num/den for num, den in zip(false_positives, denominator)]
+                false_positive_rate = [
+                    num / den for num, den in zip(false_positives, denominator)
+                ]
 
                 denominator = [sum(x) for x in zip(true_positives, false_negatives)]
-                true_positive_rate = [num/den for num, den in zip(true_positives, denominator)]
+                true_positive_rate = [
+                    num / den for num, den in zip(true_positives, denominator)
+                ]
 
                 return (
                     test_loss,
@@ -441,7 +444,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                     recall,
                     accuracy_per_class,
                     true_positive_rate,
-                    false_positive_rate
+                    false_positive_rate,
                 )
 
             raise NotYetInitializedFederatedLearningError

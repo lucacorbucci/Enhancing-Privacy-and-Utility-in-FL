@@ -1,6 +1,7 @@
 # Libraries imports
 import sys, warnings, torch, gc
 import numpy as np
+
 # Modules imports
 from abc import ABC
 from collections import Counter
@@ -11,6 +12,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from torch import nn, optim
+
 # Cross-library imports
 from pistacchio_light.Exceptions.errors import (
     InvalidDatasetError,
@@ -46,9 +48,9 @@ class FederatedModel(ABC, Generic[TDestination]):
         node_name: str,
         preferences: dict,
     ) -> None:
-        """Initialize the Federated Model. This model will be attached to a 
-        specific client and will wait for further instructions. Note that 
-        sole initialization will not load the data or model yet, it must be 
+        """Initialize the Federated Model. This model will be attached to a
+        specific client and will wait for further instructions. Note that
+        sole initialization will not load the data or model yet, it must be
         initialized separately by calling init_model function.
 
         Args:
@@ -62,17 +64,17 @@ class FederatedModel(ABC, Generic[TDestination]):
         self.preferences = preferences
         self.diff_privacy_initialized = False
         self.node_name = node_name
-        
-        #TODO: Add support for training on different GPUs.
-        #gpus = preferences.gpu_config
-        #expected_len = 11
-        #if len(node_name) == expected_len:
-            #if gpus:
-                #gpu_name = gpus[int(node_name[10]) % len(gpus)]
-            #self.device = torch.device(
-                #gpu_name if torch.cuda.is_available() and gpus else "cpu",
-            #)
-            #logger.debug(f"Running on {self.device}")
+
+        # TODO: Add support for training on different GPUs.
+        # gpus = preferences.gpu_config
+        # expected_len = 11
+        # if len(node_name) == expected_len:
+        # if gpus:
+        # gpu_name = gpus[int(node_name[10]) % len(gpus)]
+        # self.device = torch.device(
+        # gpu_name if torch.cuda.is_available() and gpus else "cpu",
+        # )
+        # logger.debug(f"Running on {self.device}")
 
         self.net = None
 
@@ -87,11 +89,13 @@ class FederatedModel(ABC, Generic[TDestination]):
         """
         if self.node_name != "orchestrator":
             self.trainloader, self.testloader = self.prepare_data(local_dataset)
-            if self.preferences['verbose'] >= 2:
-                print(f"Data of {self.node_name} prepared: {self.trainloader}, {self.testloader}")
+            if self.preferences["verbose"] >= 2:
+                print(
+                    f"Data of {self.node_name} prepared: {self.trainloader}, {self.testloader}"
+                )
         else:
             self.testloader = self.prepare_data(local_dataset)
-            if self.preferences['verbose'] >= 2:
+            if self.preferences["verbose"] >= 2:
                 print(f"Data of {self.node_name} prepared: {self.testloader}")
 
         self.add_model(net)
@@ -121,8 +125,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             model = ModuleValidator.fix(model)
 
     def prepare_data(
-        self,
-        local_dataset = list
+        self, local_dataset=list
     ) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         """Convert training and test data stored on the local client into
         torch.utils.data.DataLoader..
@@ -136,7 +139,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             Exception: Preference is not initialized
         """
         assert self.preferences
-        if self.node_name != 'orchestrator':
+        if self.node_name != "orchestrator":
             batch_size = self.preferences["hyperparameters"]["batch_size"]
             trainloader = torch.utils.data.DataLoader(
                 local_dataset[0],
@@ -151,7 +154,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 shuffle=False,
                 num_workers=0,
             )
-            #self.print_data_stats(trainloader)
+            # self.print_data_stats(trainloader)
             return trainloader, testloader
         else:
             testloader = torch.utils.data.DataLoader(
@@ -257,7 +260,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             running_loss = 0.0
             total_correct = 0
             total = 0
-            #self.net = self.net.to(self.device)
+            # self.net = self.net.to(self.device)
 
             self.net.train()
             for _, (data, target) in enumerate(self.trainloader, 0):
@@ -267,7 +270,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 if isinstance(data, list):
                     data = data[0]
 
-                #data, target = data.to(self.device), target.to(self.device)
+                # data, target = data.to(self.device), target.to(self.device)
                 # forward pass, backward pass and optimization
                 outputs = self.net(data)
                 _, predicted = torch.max(outputs.data, 1)
@@ -284,10 +287,9 @@ class FederatedModel(ABC, Generic[TDestination]):
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 self.net.zero_grad()
-        
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-
 
             loss = running_loss / len(self.trainloader)
             accuracy = total_correct / total
@@ -416,23 +418,27 @@ class FederatedModel(ABC, Generic[TDestination]):
 
                 false_positives = []
                 for i in range(num_classes):
-                    false_positives.append(sum(cm[:,i]) - cm[i,i])
+                    false_positives.append(sum(cm[:, i]) - cm[i, i])
 
                 false_negatives = []
                 for i in range(num_classes):
-                    false_negatives.append(sum(cm[i,:]) - cm[i,i])
+                    false_negatives.append(sum(cm[i, :]) - cm[i, i])
 
                 true_negatives = []
                 for i in range(num_classes):
-                    temp = np.delete(cm, i, 0)   # delete ith row
+                    temp = np.delete(cm, i, 0)  # delete ith row
                     temp = np.delete(temp, i, 1)  # delete ith column
                     true_negatives.append(sum(sum(temp)))
 
                 denominator = [sum(x) for x in zip(false_positives, true_negatives)]
-                false_positive_rate = [num/den for num, den in zip(false_positives, denominator)]
+                false_positive_rate = [
+                    num / den for num, den in zip(false_positives, denominator)
+                ]
 
                 denominator = [sum(x) for x in zip(true_positives, false_negatives)]
-                true_positive_rate = [num/den for num, den in zip(true_positives, denominator)]
+                true_positive_rate = [
+                    num / den for num, den in zip(true_positives, denominator)
+                ]
 
                 return (
                     test_loss,
@@ -442,7 +448,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                     recall,
                     accuracy_per_class,
                     true_positive_rate,
-                    false_positive_rate
+                    false_positive_rate,
                 )
 
             raise NotYetInitializedFederatedLearningError

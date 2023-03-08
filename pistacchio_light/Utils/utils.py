@@ -187,10 +187,7 @@ class Utils:
             wandb_run.log_artifact(artifact)
 
     @staticmethod
-    def log_metrics_to_wandb(
-        wandb_run: ModuleType,
-        metrics: dict
-    ) -> None:
+    def log_metrics_to_wandb(wandb_run: ModuleType, metrics: dict) -> None:
         """Log metrics to wandb.
 
         Args:

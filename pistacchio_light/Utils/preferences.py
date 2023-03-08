@@ -2,8 +2,10 @@ import time
 from pistacchio_light.Exceptions.errors import MissingConfigurationError
 from pistacchio_light.Utils.task import Task
 
+
 class Preferences:
     """Definition of the class Preferences, used to store the configuration."""
+
     def __init__(
         self,
         task: str,
@@ -18,7 +20,7 @@ class Preferences:
         p2p_config: dict | None = None,
         gpu_config: list | None = None,
         wandb_tags: list | None = ["experiment"],
-        wandb_project: str = "project"
+        wandb_project: str = "project",
     ) -> None:
         """Initialization of the class Preferences.
 
@@ -89,5 +91,5 @@ class Preferences:
             server_config=data.get("server_config", None),
             gpu_config=data.get("gpu_config", None),  # ["cuda:0", "cuda:1"]
             wandb_tags=data.get("wandb_tags", ["experiment"]),
-            wandb_project=data.get("wandb_project", "project")
+            wandb_project=data.get("wandb_project", "project"),
         )

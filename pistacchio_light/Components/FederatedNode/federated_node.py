@@ -22,7 +22,7 @@ logger.add(
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | {level} | {message}",
 )
 
-#TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
+# TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
 
 
 class FederatedNode:
@@ -30,7 +30,7 @@ class FederatedNode:
         self,
         node_id: str,
         preferences: dict,
-        ) -> int:
+    ) -> int:
         """FederatedNode is the component that can serve as an abstraction
             class for creating one federated node. It is a classic federated node
             that serves as an individual client that has joined the network.
@@ -38,7 +38,7 @@ class FederatedNode:
             node_id (str): id of the node
             preferences (dict): preferences dictionary
         """
-        self.status = 0 # 0 if transaction failed, 1 if successful
+        self.status = 0  # 0 if transaction failed, 1 if successful
         self.federated_model = None
         self.message_counter = 0
         self.mixed = False
@@ -66,33 +66,40 @@ class FederatedNode:
             node_name=self.node_id,
             preferences=self.preferences,
         )
-        self.federated_model.init_model(net=model,
-                                   local_dataset=[self.local_traindata, self.local_testdata])
-    
-    def load_local_data(self, 
-                        from_disk = True, 
-                        data = None) -> None:
+        self.federated_model.init_model(
+            net=model, local_dataset=[self.local_traindata, self.local_testdata]
+        )
+
+    def load_local_data(self, from_disk=True, data=None) -> None:
         self.status = 0
         if from_disk:
             logger.info(f"Node {self.node_id} is trying to load it's data")
             try:
-                trn_path = os.path.join(os.getcwd(),\
-                                f"generated_datasets",
-                                self.preferences["dataset"],\
-                                self.preferences["task_specification"],\
-                                "train_set", f"{self.node_id}_cluster_0")
-                tst_path = os.path.join(os.getcwd(),\
-                                f"generated_datasets",
-                                self.preferences["dataset"],\
-                                self.preferences["task_specification"],\
-                                "test_set", f"{self.node_id}_cluster_0")
-                with open(trn_path, 'rb') as file:
+                trn_path = os.path.join(
+                    os.getcwd(),
+                    f"generated_datasets",
+                    self.preferences["dataset"],
+                    self.preferences["task_specification"],
+                    "train_set",
+                    f"{self.node_id}_cluster_0",
+                )
+                tst_path = os.path.join(
+                    os.getcwd(),
+                    f"generated_datasets",
+                    self.preferences["dataset"],
+                    self.preferences["task_specification"],
+                    "test_set",
+                    f"{self.node_id}_cluster_0",
+                )
+                with open(trn_path, "rb") as file:
                     self.local_traindata = dill.load(file)
-                with open(tst_path, 'rb') as file:
+                with open(tst_path, "rb") as file:
                     self.local_testdata = dill.load(file)
                 self.status = 1
             except:
-                logger.warning(f"An error occured, {self.node_id} failed to load the data.")
+                logger.warning(
+                    f"An error occured, {self.node_id} failed to load the data."
+                )
         else:
             logger.info(f"Node {self.node_id} is trying to load the passed dataset")
             try:
@@ -100,9 +107,10 @@ class FederatedNode:
                 self.local_testdata = data[1]
                 self.status = 1
             except:
-                logger.warning(f"An error occured, {self.node_id} failed to load the data.")
+                logger.warning(
+                    f"An error occured, {self.node_id} failed to load the data."
+                )
 
-    
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
 
@@ -115,7 +123,6 @@ class FederatedNode:
             self.server_channel.send_data(weights)
         else:
             raise ValueError("Server channel not initialized")
-
 
     def add_server_channel(self, server_channel: CommunicationChannel) -> None:
         """This function adds the server channel to the sender thread.
@@ -150,7 +157,6 @@ class FederatedNode:
             loss, accuracy = self.federated_model.train()
         return {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
 
-
     def send_and_receive_weights_with_server(
         self,
         federated_model: FederatedModel,
@@ -184,7 +190,6 @@ class FederatedNode:
 
         return received_weights
 
-    
     def send_performances(self, performances: dict[str, Performances]) -> None:
         """This function is used to send the performances of
         the node to the server.
@@ -196,7 +201,6 @@ class FederatedNode:
             self.server_channel.send_data(performances)
         else:
             raise NotYetInitializedServerChannelError
-
 
     def compute_performances(
         self,
@@ -241,7 +245,6 @@ class FederatedNode:
 
         return performances
 
-
     def receive_starting_model_from_server(
         self,
         federated_model: FederatedModel,
@@ -257,7 +260,6 @@ class FederatedNode:
         received_weights = self.receive_data_from_server()
         federated_model.update_weights(received_weights)
 
-
     def start_node(self, model: nn.Module) -> None:
         """This method implements all the logic of the federated node.
         It starts the training of the model and then sends the weights to the
@@ -270,20 +272,19 @@ class FederatedNode:
         """
         logger.debug(f"Starting node {self.node_id}")
         self.federated_model = self.init_federated_model(model)
-        
+
         # self.receive_starting_model_from_server(federated_model=federated_model)
         # logger.debug(f"Node {self.node_id} received starting model from server")
-        #differential_private_train = self.preferences.server_config[
-            #"differential_privacy_server"
-        #]
+        # differential_private_train = self.preferences.server_config[
+        # "differential_privacy_server"
+        # ]
         # Initialize differential privacy if needed
         # if differential_private_train:
         #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
-        
+
         logger.debug(f"Node {self.node_id} started")
 
-     
     def train_local_model(
         self,
         # results: dict | None = None,
@@ -306,11 +307,11 @@ class FederatedNode:
         epsilon_list: list[float] = []
 
         local_epochs = self.preferences["orchestrator_settings"]["local_epochs"]
-        
-        #TODO
-        #differential_private_train = self.preferences.server_config[
-            #"differential_privacy_server"
-        #]
+
+        # TODO
+        # differential_private_train = self.preferences.server_config[
+        # "differential_privacy_server"
+        # ]
 
         for _ in range(local_epochs):
             metrics = self.local_training(differential_private_train=False)
@@ -318,7 +319,7 @@ class FederatedNode:
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
-        
+
         logger.debug("2")
         return Weights(
             weights=self.federated_model.get_weights(),
