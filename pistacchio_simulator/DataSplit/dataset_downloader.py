@@ -2,10 +2,11 @@ import numpy as np
 import torch
 import torchvision
 from torchvision import datasets, transforms
-
 from pistacchio_simulator.DataSplit.custom_dataset import CelebaGenderDataset, MyDataset
 from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
 from pistacchio_simulator.Utils.utils import Utils
+import pandas as pd
+from pathlib import Path
 
 
 class DatasetDownloader:
@@ -17,7 +18,7 @@ class DatasetDownloader:
     """
 
     @staticmethod
-    def download_dataset(dataset_name: str) -> tuple:
+    def download_dataset(dataset_name: str, dataset_path: None | str = None) -> tuple:
         """Downloads the dataset with the given name.
 
         Args:
@@ -29,25 +30,25 @@ class DatasetDownloader:
         -------
             _type_: The downloaded dataset
         """
-        if dataset_name == "mnist":
-            train_ds, test_ds = DatasetDownloader.download_mnist()
-        elif dataset_name == "cifar10":
-            train_ds, test_ds = DatasetDownloader.download_cifar10()
-        elif dataset_name == "adult":
-            train_ds, test_ds = DatasetDownloader.download_adult()
-        elif dataset_name == "celeba":
-            train_ds, test_ds = DatasetDownloader.download_celeba()
-        elif dataset_name == "celeba_gender":
-            train_ds, test_ds = DatasetDownloader.download_celeba_gender()
-        elif dataset_name == "fashion_mnist":
-            train_ds, test_ds = DatasetDownloader.download_fashion_mnist()
-        elif dataset_name == "imaginette":
-            train_ds, test_ds = DatasetDownloader.download_imaginette()
-        elif dataset_name == "fair_face":
-            train_ds, test_ds = DatasetDownloader.download_fair_face()
-        else:
-            raise InvalidDatasetErrorNameError()
-        return train_ds, test_ds
+        match dataset_name:
+            case "mnist":
+                return DatasetDownloader.download_mnist()
+            case "cifar10":
+                DatasetDownloader.download_cifar10()
+            case "adult":
+                DatasetDownloader.download_adult()
+            case "celeba":
+                DatasetDownloader.download_celeba()
+            case "celeba_gender":
+                DatasetDownloader.download_celeba_gender()
+            case "fashion_mnist":
+                DatasetDownloader.download_fashion_mnist()
+            case "imagenette":
+                DatasetDownloader.download_imaginette()
+            case "fair_face":
+                DatasetDownloader.download_fair_face(dataset_path)
+            case _:
+                raise InvalidDatasetErrorNameError()
 
     @staticmethod
     def download_mnist() -> tuple[
@@ -146,10 +147,9 @@ class DatasetDownloader:
         return imaginette_train_ds, imaginette_test_ds
 
     @staticmethod
-    def download_fair_face() -> tuple[
-        torchvision.datasets.ImageFolder,
-        torchvision.datasets.ImageFolder,
-    ]:
+    def download_fair_face(
+        dataset_path: str,
+    ) -> tuple[torchvision.datasets.ImageFolder, torchvision.datasets.ImageFolder,]:
         """This function downloads the fair_face dataset.
 
         Returns
@@ -157,29 +157,35 @@ class DatasetDownloader:
             Tuple[torchvision.datasets.ImageFolder, torchvision.datasets.ImageFolder]:
             the train and test dataset
         """
-        transform = transforms.Compose(
-            [
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406],
-                    std=[0.229, 0.224, 0.225],
-                ),
-            ],
-        )
-        print("OK 1")
-        fair_face_train_ds = torchvision.datasets.ImageFolder(
-            "../data/fair_face/train_data",
-            transform=transform,
-        )
 
-        fair_face_test_ds = torchvision.datasets.ImageFolder(
-            "../data/fair_face/val_data",
-            transform=transform,
-        )
-        print("OK")
-        return fair_face_train_ds, fair_face_test_ds
+        base_path = Path(dataset_path)
+        train_df = pd.read_csv(f"{base_path}/train.csv")
+        public_df = pd.read_csv(f"{base_path}/public.csv")
+        test_df = pd.read_csv(f"{base_path}/test.csv")
+
+        train_df["file"] = [f"{base_path}/{path}" for path in train_df["file"]]
+        test_df["file"] = [f"{base_path}/{path}" for path in test_df["file"]]
+        public_df["file"] = [f"{base_path}/{path}" for path in public_df["file"]]
+
+        gender_map = {"Male": 0, "Female": 1}
+        race_map = {
+            "Black": 0,
+            "East Asian": 1,
+            "Indian": 2,
+            "Latino_Hispanic": 3,
+            "Middle Eastern": 4,
+            "Southeast Asian": 5,
+            "White": 6,
+        }
+
+        train_df["gender_code"] = [gender_map[x] for x in train_df["gender"]]
+        test_df["gender_code"] = [gender_map[x] for x in test_df["gender"]]
+        public_df["gender_code"] = [gender_map[x] for x in public_df["gender"]]
+
+        train_df["race_code"] = [race_map[x] for x in train_df["race"]]
+        test_df["race_code"] = [race_map[x] for x in test_df["race"]]
+        public_df["race_code"] = [race_map[x] for x in public_df["race"]]
+        return train_df, test_df, public_df
 
     @staticmethod
     def download_celeba() -> tuple[
