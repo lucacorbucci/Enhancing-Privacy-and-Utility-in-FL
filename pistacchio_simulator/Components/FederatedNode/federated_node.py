@@ -3,8 +3,6 @@ import time
 from typing import Any, Mapping, TypeVar
 
 from loguru import logger
-from torch import Tensor, nn
-
 from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
 from pistacchio_simulator.Models.federated_model import FederatedModel
 from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
@@ -13,7 +11,7 @@ from pistacchio_simulator.Utils.performances import Performances
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.weights import Weights
-
+from torch import Tensor, nn
 
 logger.remove()
 logger.add(
@@ -35,6 +33,7 @@ class FederatedNode:
         self,
         node_id: str,
         preferences: Preferences,
+        cluster_id: str,
         # server_channel: CommunicationChannel,
         # logging_queue: CommunicationChannel,
         # receiver_channel: CommunicationChannel | None = None,
@@ -49,35 +48,14 @@ class FederatedNode:
             #     performances of the node to the main thread.
         """
         self.node_id = node_id
+        self.cluster_id = cluster_id
         # self.logging_queue = logging_queue
         self.preferences = preferences
         self.mode = "federated"
-        # self.receiver_channel = (
-        #     receiver_channel if receiver_channel else CommunicationChannel(name=node_id)
-        # )
         self.mixed = False
         self.message_counter = 0
-        # self.server_channel: CommunicationChannel | None = None
         self.federated_model = None
 
-    # def receive_data_from_server(self) -> Any:
-    #     """This function receives the weights from the server.
-    #     If the weights are not received, it returns an error message
-    #     otherwise it returns the weights.
-
-    #     Returns
-    #     -------
-    #         Union[Weights, None]: Weights received from the server
-    #     """
-    #     try:
-    #         received_data = self.receiver_channel.receive_data()
-    #         return (
-    #             received_data
-    #             if received_data == Message.STOP
-    #             else received_data.weights
-    #         )
-    #     except (ValueError, AttributeError):
-    #         return Message.ERROR
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -118,8 +96,6 @@ class FederatedNode:
         federated_model.init_model(net=model)
 
         return federated_model
-
- 
 
     def local_training(
         self,
@@ -179,7 +155,6 @@ class FederatedNode:
 
         return received_weights
 
-    
     def send_performances(self, performances: dict[str, Performances]) -> None:
         """This function is used to send the performances of
         the node to the server.
@@ -218,7 +193,7 @@ class FederatedNode:
         """
         epochs = range(
             1,
-            self.preferences.server_config["num_communication_round_with_server"] + 1,
+            self.preferences.hyperparameters["fl_rounds"] + 1,
         )
 
         performances = {}
@@ -275,7 +250,6 @@ class FederatedNode:
         #     logger.debug(f"Node {self.node_id} initialized differential privacy")
         logger.debug(f"Node {self.node_id} started")
 
-     
     def train_local_model(
         self,
         # results: dict | None = None,
@@ -297,9 +271,7 @@ class FederatedNode:
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
 
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
+        local_epochs = self.preferences.server_config["local_epochs"]
         differential_private_train = self.preferences.server_config[
             "differential_privacy_server"
         ]
@@ -312,21 +284,10 @@ class FederatedNode:
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
-        
+
         logger.debug("2")
         return Weights(
             weights=self.federated_model.get_weights(),
             sender=self.node_id,
             epsilon=metrics["epsilon"],
         )
-
-        # received_weights = self.send_and_receive_weights_with_server(
-        #     federated_model=federated_model,
-        #     metrics=metrics,
-        #     results=results,
-        # )
-
-        # Update the weights of the model
-        # federated_model.update_weights(received_weights)
-
-        # return loss_list, accuracy_list, epsilon_list,

@@ -1,43 +1,56 @@
 {
-    "dataset": "mnist",
-    "mode": "classic",
+    "dataset": "imaginette_csv",
+    "mode": "semi_p2p",
     "task": "federatedlearning",
     "debug": true,
     "save_model": false,
     "federated": true,
-    "wandb": false,
+    "wandb": true,
+    "public_private_experiment": true, 
     "data_split_config": {
-        "split_type": "stratified",
+        "split_type_clusters": "majority_minority",
+        "split_type_nodes": "non_iid_public_private",
         "num_classes": 10,
-        "num_nodes": 1,
-        "num_clusters": 1000,
-        "noniid_nodes_distribution": false,
-        "num_classes_per_cluster": 1000,
-        "server_validation_set": "server_validation_split"
+        "num_nodes": 3,
+        "num_clusters": 10,
+        "noniid_nodes_distribution": true,
+        "alpha": 1.0,
+        "server_validation_set": "server_validation_split",
+        "store_path": "../data/imaginette_csv/federated_data"
+    },
+    "p2p_config": {
+        "differential_privacy": false,
+        "differential_privacy_mixed_mode": false,
+        "local_training_epochs": 1,
+        "FL_rounds": 0,
+        "round_mixed_mode": 1
     },
     "server_config": {
-        "differential_privacy_server": true,
+        "differential_privacy": false,
         "mixed_mode": false,
-        "local_training_epochs_with_server": 1,
-        "num_communication_round_with_server": 5,
-        "total_mixed_iterations": 1,
-        "server_pre_training": false,
-        "server_pre_training_dataset": "server_validation_split"
+        "local_training_epochs": 1,
+        "FL_rounds": 20,
+        "total_mixed_rounds": 1
     },
     "hyperparameters": {
         "batch_size": 32,
         "lr": 0.001,
         "MAX_PHYSICAL_BATCH_SIZE": 128,
         "DELTA": 1e-5,
-        "noise_multiplier": 0.5,
-        "max_grad_norm": 1.2,
-        "weight_decay": 0,
-        "min_improvement": 0.001,
-        "patience": 10,
-        "min_accuracy": 0.80
+        "noise_multiplier": 2,
+        "noise_multiplier_P2P": 1,
+        "max_grad_norm": 2.0,
+        "weight_decay": 0
     },
     "gpu_config": [
         "cuda:0",
-        "cuda:0"
-    ]
+        "cuda:1"
+    ],
+    "wandb_config": {
+        "tags": [
+            "imaginette_10_3_p2p_test"
+        ],
+        "name": "Baseline No Privacy",
+        "project_name": "Public_Private"
+    }
 }

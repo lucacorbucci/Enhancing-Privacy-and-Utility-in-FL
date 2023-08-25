@@ -1,8 +1,8 @@
 import argparse
 import json
 
-from pistacchio_simulator.DataSplit.generate_dataset import generate_splitted_dataset
-from pistacchio_simulator.Utils.preferences import Preferences
+from FederatedDataset.partition_dataset import FederatedDataset
+from FederatedDataset.Utils.preferences import Preferences
 
 
 def main() -> None:
@@ -23,9 +23,9 @@ def main() -> None:
     config = None
     with open(args.config, "r", encoding="utf-8") as file:
         config = json.load(file)
-    config = Preferences.generate_from_json(config)
+    config = Preferences(**config)
 
-    generate_splitted_dataset(config=config)
+    FederatedDataset.generate_partitioned_dataset(config=config)
 
 
 if __name__ == "__main__":

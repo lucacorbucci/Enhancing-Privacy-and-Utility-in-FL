@@ -8,8 +8,8 @@ readme = "README.md"
 packages = [ { include = "pistacchio-simulator" } ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
-torch = "^1.13.1"
+python = "3.8"
+torch = "2.0.0"
 numpy = "^1.24.1"
 mypy = "^0.991"
 scikit-learn = "^1.2.1"
@@ -17,21 +17,22 @@ torchsummary = "^1.5.1"
 tqdm = "^4.64.1"
 python-dotenv = "^0.21.1"
 regex = "^2022.10.31"
-wandb = "^0.13.9"
+wandb = "^0.14.0"
 pandas = "^1.5.3"
 dill = "^0.3.6"
 multiprocess = "^0.70.14"
-torchvision = "^0.14.1"
+torchvision = "^0.15.1"
 pydantic = "^1.10.4"
 ruff = "^0.0.238"
 pydoc-markdown = "^4.6.4"
 loguru = "^0.6.0"
 opacus = {git = "https://github.com/pytorch/opacus.git"}
+pistacchio-federated-dataset = {file = "/Users/lucacorbucci/Documents/PhD/Lavoro/Code/FederatedDataset/dist/pistacchio_federated_dataset-0.0.1.post15-py3-none-any.whl"}
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.12.0"
-black = {extras = ["jupyter"], version = "^22.12.0"}
-pytest = "^7.2.1"
+black = {extras = ["jupyter"], version = "^23.3.0"}
+pytest = "^7.2.2"
 coverage = "^7.1.0"
 
 [build-system]
