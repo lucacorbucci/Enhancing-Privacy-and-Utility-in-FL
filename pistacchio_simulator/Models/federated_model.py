@@ -10,9 +10,6 @@ from loguru import logger
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
-from torch import nn, optim
-
 from pistacchio.Exceptions.errors import (
     InvalidDatasetNameError,
     NotYetInitializedFederatedLearningError,
@@ -21,6 +18,9 @@ from pistacchio.Exceptions.errors import (
 from pistacchio.Utils.data_loader import DataLoader
 from pistacchio.Utils.phases import Phase
 from pistacchio.Utils.preferences import Preferences
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from torch import nn, optim
+
 
 warnings.filterwarnings("ignore")
 
@@ -586,6 +586,8 @@ class FederatedModel(ABC, Generic[TDestination]):
 
         Args:
             phase (Phase): phase of the training
+            noise_multiplier: float: noise that we want to add 
+                every time we touch the data
         Raises:
             Exception: Preference is not initialized
         """

@@ -12,14 +12,12 @@ import multiprocess
 import torch
 from loguru import logger
 from multiprocess.pool import ThreadPool
-from torch import nn
-
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.Models.federated_model import FederatedModel
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-
+from torch import nn
 
 logger.remove()
 logger.add(
@@ -160,8 +158,6 @@ class Orchestrator:
                 results = [
                     pool.apply_async(start_train, (node,)) for node in sampled_nodes
                 ]
-
-                ready = []
 
                 count = 0
                 for result in results:
