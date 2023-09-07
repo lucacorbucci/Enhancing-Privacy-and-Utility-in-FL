@@ -1,44 +1,45 @@
 {
-    "dataset": "imaginette_csv",
+    "dataset": "mnist",
     "mode": "semi_p2p",
-    "task": "federatedlearning",
+    "task_type": "federatedlearning",
     "debug": true,
     "save_model": false,
     "federated": true,
     "wandb": true,
-    "public_private_experiment": true, 
+    "public_private_experiment": true,
+    "pool_size": 32,
     "data_split_config": {
         "split_type_clusters": "majority_minority",
         "split_type_nodes": "non_iid_public_private",
         "num_classes": 10,
         "num_nodes": 3,
-        "num_clusters": 10,
+        "num_clusters": 8,
         "noniid_nodes_distribution": true,
         "alpha": 1.0,
-        "server_validation_set": "server_validation_split",
-        "store_path": "../data/imaginette_csv/federated_data"
+        "server_validation_set": "server_validation_set.pt",
+        "store_path": "../data/mnist/federated_data"
     },
     "p2p_config": {
         "differential_privacy": false,
         "differential_privacy_mixed_mode": false,
         "local_training_epochs": 1,
-        "FL_rounds": 0,
-        "round_mixed_mode": 1
+        "fl_rounds": 5,
+        "round_mixed_mode": 1,
+        "noise_multiplier": 0
     },
     "server_config": {
-        "differential_privacy": false,
+        "differential_privacy": true,
         "mixed_mode": false,
         "local_training_epochs": 1,
-        "FL_rounds": 20,
-        "total_mixed_rounds": 1
+        "fl_rounds": 10,
+        "total_mixed_rounds": 1,
+        "noise_multiplier": 1
     },
-    "hyperparameters": {
+    "hyperparameters_config": {
         "batch_size": 32,
         "lr": 0.001,
-        "MAX_PHYSICAL_BATCH_SIZE": 128,
-        "DELTA": 1e-5,
-        "noise_multiplier": 2,
-        "noise_multiplier_P2P": 1,
+        "max_phisical_batch_size": 128,
+        "delta": 1e-5,
         "max_grad_norm": 2.0,
         "weight_decay": 0
     },
@@ -48,9 +49,9 @@
     ],
     "wandb_config": {
         "tags": [
-            "imaginette_10_3_p2p_test"
+            "mnist_simulation_test"
         ],
-        "name": "Baseline No Privacy",
+        "name": "Privacy Server",
         "project_name": "Public_Private"
     }
 }

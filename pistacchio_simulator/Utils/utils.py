@@ -6,10 +6,10 @@ from types import ModuleType
 from typing import Any, Mapping, TypeVar
 
 import torch
+import wandb
 from dotenv import load_dotenv
 from torch import Tensor
 
-import wandb
 from pistacchio_simulator.Utils.preferences import Preferences
 
 
@@ -72,7 +72,6 @@ class Utils:
         for node_name, models in shared_data.items():
             mean = []
             for layer_name in models:
-
                 mean.append(
                     torch.mean(
                         torch.subtract(models[layer_name], average_weights[layer_name]),
@@ -104,36 +103,35 @@ class Utils:
         -------
             str: experiment name
         """
-        if preferences.removed_node_id:
-            return f"removed_node_{str(preferences.removed_node_id)}"
+        
 
         diff_private = (
             ""
-            if not preferences.server_config["differential_privacy_server"]
+            if not preferences.server_config.differential_privacy
             else "differentiallyprivate_"
         )
         noise_multiplier = (
             ""
-            if not preferences.hyperparameters.get("noise_multiplier", None)
-            else f"noise_multiplier_{preferences.hyperparameters['noise_multiplier']}_"
+            if not preferences.server_config.differential_privacy
+            else f"noise_multiplier_{preferences.server_config.noise_multiplier}_"
         )
         max_grad_norm = (
             ""
-            if not preferences.hyperparameters.get("max_grad_norm", None)
-            else f"max_grad_norm_{preferences.hyperparameters['max_grad_norm']}_"
+            if not preferences.hyperparameters_config.max_grad_norm
+            else f"max_grad_norm_{preferences.hyperparameters_config.max_grad_norm}_"
         )
         return (
             ""
-            + str(preferences.dataset_name)
+            + str(preferences.dataset)
             + "_"
-            + str(preferences.data_split_config["num_nodes"])
+            + str(preferences.data_split_config.num_nodes)
             + "_nodes_"
-            + str(preferences.data_split_config["num_clusters"])
+            + str(preferences.data_split_config.num_clusters)
             + "_clusters_"
             + diff_private
             + noise_multiplier
             + max_grad_norm
-            + str(preferences.experiment_name)
+            + str(preferences.wandb_config.name)
         )
 
     @staticmethod
@@ -152,22 +150,26 @@ class Utils:
         load_dotenv()
 
         wandb_entity = os.getenv("WANDB_ENTITY")
-        config_dictionary = preferences.hyperparameters
-        config_dictionary["num_nodes"] = preferences.data_split_config["num_nodes"]
-        config_dictionary["num_clusters"] = preferences.data_split_config[
-            "num_clusters"
-        ]
+        config_dictionary = {}
+        config_dictionary["lr"] = preferences.hyperparameters_config.lr
+        config_dictionary["batch_size"] = preferences.hyperparameters_config.batch_size
+        config_dictionary["max_phisical_batch_size"] = preferences.hyperparameters_config.max_phisical_batch_size
+        config_dictionary["delta"] = preferences.hyperparameters_config.delta
+        config_dictionary["max_grad_norm"] = preferences.hyperparameters_config.max_grad_norm
+        config_dictionary["num_nodes"] = preferences.data_split_config.num_nodes
+        config_dictionary["num_clusters"] = preferences.data_split_config.num_clusters
 
         if preferences.p2p_config:
-            config_dictionary["step_P2P"] = preferences.p2p_config[
-                "num_communication_round_pre_training"
-            ]
+            config_dictionary["fl_round_P2P"] = preferences.p2p_config.fl_rounds
+        if preferences.server_config:
+            config_dictionary["fl_round_SERVER"] = preferences.server_config.fl_rounds
+        
         wandb.init(
-            project=preferences.wandb_project,
+            project=preferences.wandb_config.project_name,
             entity=wandb_entity,
             config=config_dictionary,
             group=group,
-            tags=preferences.wandb_tags,
+            tags=preferences.wandb_config.tags,
         )
         if wandb.run:
             wandb.run.name = Utils.get_run_name(preferences=preferences)
@@ -187,10 +189,7 @@ class Utils:
             wandb_run.log_artifact(artifact)
 
     @staticmethod
-    def log_metrics_to_wandb(
-        wandb_run: ModuleType,
-        metrics: dict
-    ) -> None:
+    def log_metrics_to_wandb(wandb_run: ModuleType, metrics: dict) -> None:
         """Log metrics to wandb.
 
         Args:

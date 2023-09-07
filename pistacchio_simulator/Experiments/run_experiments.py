@@ -1,18 +1,18 @@
+
 import torch
+from pydantic.tools import parse_obj_as
 from torch import nn
 
 from pistacchio_simulator.Components.Orchestrator.orchestrator import Orchestrator
-from pistacchio_simulator.Exceptions.errors import InvalidDatasetErrorNameError
+from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
 from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
 from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task, TaskType
-from multiprocessing import set_start_method
 
 
 class Experiment:
-
     @staticmethod
     def get_model(preferences: Preferences) -> nn.Module:
         """This function is used to get the model.
@@ -22,22 +22,22 @@ class Experiment:
             nn.Module: the model
         """
         model = None
-        if preferences.dataset_name == "mnist":
+        if preferences.dataset == "mnist":
             model = MnistNet()
-        elif preferences.dataset_name == "cifar10":
+        elif preferences.dataset == "cifar10":
             model = Experiment.get_model_to_fine_tune()
             preferences.fine_tuning = True
-        elif preferences.dataset_name == "celeba":
+        elif preferences.dataset == "celeba":
             model = CelebaNet()
-        elif preferences.dataset_name == "celeba_gender":
+        elif preferences.dataset == "celeba_gender":
             model = CelebaGenderNet()
-        elif preferences.dataset_name == "fashion_mnist":
+        elif preferences.dataset == "fashion_mnist":
             model = FashionMnistNet()
-        elif preferences.dataset_name == "imaginette":
+        elif preferences.dataset == "imaginette":
             model = Experiment.get_model_to_fine_tune()
             preferences.fine_tuning = True
         else:
-            raise InvalidDatasetErrorNameError("Invalid dataset name")
+            raise InvalidDatasetNameError("Invalid dataset name")
         return model
 
     @staticmethod
@@ -48,27 +48,27 @@ class Experiment:
             preferences (Preferences): _description_
         """
         model = Experiment.get_model(preferences)
-        
+
         orchestrator = Orchestrator(
             preferences=preferences,
             model=model,
         )
         orchestrator.launch_orchestrator()
-    
 
     @staticmethod
     def run_contribution_experiment(preferences: Preferences) -> None:
-        iterations = preferences.data_split_config["num_clusters"]*preferences.data_split_config["num_nodes"]+1
+        iterations = (
+            preferences.data_split_config["num_clusters"]
+            * preferences.data_split_config["num_nodes"]
+            + 1
+        )
         for iteration in range(iterations):
             model = Experiment.get_model(preferences)
-            
+
             orchestrator = Orchestrator(
-                preferences=preferences,
-                model=model,
-                iteration=iteration
+                preferences=preferences, model=model, iteration=iteration
             )
             orchestrator.launch_orchestrator()
-
 
     @staticmethod
     def run_fairness_experiment(preferences: Preferences) -> None:
@@ -95,7 +95,7 @@ class Experiment:
 
         Raises
         ------
-            InvalidDatasetErrorNameError: if the dataset name is not valid
+            InvalidDatasetNameError: if the dataset name is not valid
 
         Returns
         -------
@@ -103,14 +103,19 @@ class Experiment:
         """
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        set_start_method("spawn")
-        torch.multiprocessing.set_sharing_strategy("file_system")
+        
+        # set_start_method("spawn")
+        # torch.multiprocess.set_sharing_strategy("file_system")
 
-        preferences = Preferences.generate_from_json(config)
-        if preferences.task.task_type == TaskType.FEDERATEDLEARNING:
+        preferences = parse_obj_as(Preferences, config)
+        task = Task(preferences.task_type)
+        if task.task_type == TaskType.FEDERATEDLEARNING:
             Experiment.run_federated_learning_experiment(preferences)
-        elif preferences.task.task_type == TaskType.CONTRIBUTION:
-            Experiment.run_contribution_experiment(preferences)
-        elif preferences.task.task_type == TaskType.FAIRNESS:
-            Experiment.run_fairness_experiment(preferences)
+        # elif task_type == TaskType.CONTRIBUTION:
+        #     Experiment.run_contribution_experiment(preferences)
+        # elif task_type == TaskType.FAIRNESS:
+        #     Experiment.run_fairness_experiment(preferences)
+        else:
+            raise NotImplementedError("Task not implemented")
+
         return 0

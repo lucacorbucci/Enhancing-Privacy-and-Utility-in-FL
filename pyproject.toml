@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [ { include = "pistacchio-simulator" } ]
 
 [tool.poetry.dependencies]
-python = "3.8"
+python = "^3.8"
 torch = "2.0.0"
 numpy = "^1.24.1"
 mypy = "^0.991"
@@ -27,7 +27,8 @@ ruff = "^0.0.238"
 pydoc-markdown = "^4.6.4"
 loguru = "^0.6.0"
 opacus = {git = "https://github.com/pytorch/opacus.git"}
-pistacchio-federated-dataset = {file = "/Users/lucacorbucci/Documents/PhD/Lavoro/Code/FederatedDataset/dist/pistacchio_federated_dataset-0.0.1.post15-py3-none-any.whl"}
+pistacchio-federated-dataset = {file = "../FederatedDataset/dist/pistacchio_federated_dataset-0.0.1.post30-py3-none-any.whl"}
+ray = {extras = ["default"], version = "^2.6.3"}
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.12.0"

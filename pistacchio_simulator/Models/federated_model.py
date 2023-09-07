@@ -10,16 +10,17 @@ from loguru import logger
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 from opacus.validators import ModuleValidator
-from pistacchio.Exceptions.errors import (
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from torch import nn, optim
+
+from pistacchio_simulator.Exceptions.errors import (
     InvalidDatasetNameError,
     NotYetInitializedFederatedLearningError,
     NotYetInitializedPreferencesError,
 )
-from pistacchio.Utils.data_loader import DataLoader
-from pistacchio.Utils.phases import Phase
-from pistacchio.Utils.preferences import Preferences
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
-from torch import nn, optim
+from pistacchio_simulator.Utils.data_loader import DataLoader
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
 
 
 warnings.filterwarnings("ignore")
@@ -56,7 +57,7 @@ class FederatedModel(ABC, Generic[TDestination]):
 
         Raises
         ------
-            InvalidDatasetErrorNameError: _description_
+            InvalidDatasetNameError: _description_
         """
         self.device = None
         self.optimizer: optim.Optimizer = None
@@ -65,23 +66,25 @@ class FederatedModel(ABC, Generic[TDestination]):
         self.mixed = False
         self.privacy_engine = None
         if node_name != "server":
+            cluster_id = node_name.split("_")[-1]
+            node_id = node_name.split("_")[0]
             try:
                 if preferences.public_private_experiment:
-                    self.p2p_dataset = DataLoader().load_splitted_dataset_train(
-                        f"../data/{dataset_name}/federated_data/{self.node_name}_public_train.pt",
+                    self.p2p_dataset = DataLoader().load_splitted_dataset(
+                        f"../data/{dataset_name}/federated_data/cluster_{cluster_id}_node_{node_id}_public_train.pt",
                     )
-                    self.server_dataset = DataLoader().load_splitted_dataset_train(
-                        f"../data/{dataset_name}/federated_data/{self.node_name}_private_train.pt",
+                    self.server_dataset = DataLoader().load_splitted_dataset(
+                        f"../data/{dataset_name}/federated_data/cluster_{cluster_id}_node_{node_id}_private_train.pt",
                     )
                     self.training_set = None
                 else:
-                    self.training_set = DataLoader().load_splitted_dataset_train(
-                        f"../data/{dataset_name}/federated_data/{self.node_name}_train.pt",
+                    self.training_set = DataLoader().load_splitted_dataset(
+                        f"../data/{dataset_name}/federated_data/cluster_{cluster_id}_node_{node_id}_train.pt",
                     )
                     self.p2p_dataset = None
                     self.server_dataset = None
-                self.test_set = DataLoader().load_splitted_dataset_test(
-                    f"../data/{dataset_name}/federated_data/{self.node_name}_test.pt",
+                self.test_set = DataLoader().load_splitted_dataset(
+                    f"../data/{dataset_name}/federated_data/cluster_{cluster_id}_node_{node_id}_test.pt",
                 )
             except Exception as error:
                 raise InvalidDatasetNameError from error
@@ -90,12 +93,13 @@ class FederatedModel(ABC, Generic[TDestination]):
         self.preferences = preferences
         self.diff_privacy_initialized = False
         gpus = preferences.gpu_config
-        if len(node_name) == 16:
+        if len(node_name) == 11:
             if gpus:
                 gpu_name = gpus[int(node_name[-1]) % len(gpus)]
             self.device = torch.device(
                 gpu_name if torch.cuda.is_available() and gpus else "cpu",
             )
+        print(f"---> USING {self.device}")
 
         self.net = None
 
@@ -117,9 +121,9 @@ class FederatedModel(ABC, Generic[TDestination]):
 
             # self.optimizer = torch.optim.Adam(
             # self.optimizer = torch.optim.SGD(
-            self.optimizer = optim.RMSprop(
+            self.optimizer = torch.optim.RMSprop(
                 params_to_update,
-                lr=self.preferences.hyperparameters["lr"],
+                lr=self.preferences.hyperparameters_config.lr,
             )
 
     def add_model(self, model: nn.Module) -> None:
@@ -149,7 +153,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         """
 
         if self.preferences:
-            batch_size = self.preferences.hyperparameters["batch_size"]
+            batch_size = self.preferences.hyperparameters_config.batch_size
             if self.preferences.public_private_experiment:
                 self.trainloader_private = torch.utils.data.DataLoader(
                     self.server_dataset,
@@ -176,6 +180,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                 batch_size=batch_size,
                 shuffle=False,
                 num_workers=8,
+
             )
 
             if self.preferences and self.preferences.debug:
@@ -266,7 +271,6 @@ class FederatedModel(ABC, Generic[TDestination]):
                 for key, value in avg_tensors.items():
                     new_weights[key.replace("_module.", "")] = value
                 avg_tensors = new_weights
-                print("=========== SOSTITUITO ===========")
                 # avg_tensors = {
                 #     k.replace("_module.", ""): v for k, v in avg_tensors.items()
                 # }
@@ -279,7 +283,6 @@ class FederatedModel(ABC, Generic[TDestination]):
                     new_weights["_module." + key] = value
                 # avg_tensors = {"_module." + k: v for k, v in avg_tensors.items()}
                 avg_tensors = new_weights
-                print("=========== SOSTITUITO ===========")
 
             self.net.load_state_dict(avg_tensors, strict=True)
         else:
@@ -301,68 +304,10 @@ class FederatedModel(ABC, Generic[TDestination]):
         else:
             raise NotYetInitializedFederatedLearningError
 
-    def train(self, phase: Phase) -> tuple[float, torch.tensor]:
-        """Train the network and computes loss and accuracy.
-
-        Raises
-        ------
-            Exception: Raises an exception when Federated Learning is not initialized
-
-        Returns
-        -------
-            Tuple[float, float]: Loss and accuracy on the training set.
-        """
-        if self.net:
-            criterion = nn.CrossEntropyLoss()
-            running_loss = 0.0
-            total_correct = 0
-            total = 0
-
-            self.net.train()
-            if self.trainloader:
-                training_data = self.trainloader
-            else:
-                training_data = (
-                    self.trainloader_public
-                    if phase == Phase.P2P
-                    else self.trainloader_private
-                )
-                print(
-                    f"Node {self.node_name} - Phase {phase}, using a dataset of size {len(training_data.dataset)}"
-                )
-
-            for _, (data, target) in enumerate(training_data, 0):
-                self.optimizer.zero_grad()
-
-                if isinstance(data, list):
-                    data = data[0]
-                target = target.to(self.device)
-                data = data.to(self.device)
-
-                # forward pass, backward pass and optimization
-                outputs = self.net(data)
-                loss = criterion(outputs, target)
-                loss.backward()
-                self.optimizer.step()
-
-                _, predicted = torch.max(outputs.data, 1)
-                correct = (predicted == target).float().sum()
-                running_loss += loss.item()
-                total_correct += correct
-                total += target.size(0)
-
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-
-            loss = running_loss / len(training_data)
-            accuracy = total_correct / total
-            logger.info(f"Training loss: {loss}, accuracy: {accuracy}")
-
-            return loss, accuracy
-        raise NotYetInitializedFederatedLearningError
-
+    
     def train_with_differential_privacy(
-        self, phase: Phase
+        self,
+        phase: Phase,
     ) -> tuple[float, float, float, float]:
         """Train the network using differential privacy and computes loss and accuracy.
 
@@ -375,14 +320,15 @@ class FederatedModel(ABC, Generic[TDestination]):
             Tuple[float, float, float, float]: Loss, accuracy, epsilon and noise multiplier
         """
         if self.net:
-            max_physical_batch_size = self.preferences.hyperparameters[
-                "MAX_PHYSICAL_BATCH_SIZE"
-            ]
+            max_physical_batch_size = (
+                self.preferences.hyperparameters_config.max_phisical_batch_size
+            )
             # Train the network
             criterion = nn.CrossEntropyLoss()
             running_loss = 0.0
             total_correct = 0
             total = 0
+            losses = []
             self.net.train()
 
             if self.trainloader:
@@ -391,12 +337,13 @@ class FederatedModel(ABC, Generic[TDestination]):
                 training_data = (
                     self.trainloader_public
                     if phase == Phase.P2P
+
                     else self.trainloader_private
                 )
                 print(
                     f"Node {self.node_name} - Phase {phase}, using a dataset of size {len(training_data.dataset)}"
                 )
-
+            
             with BatchMemoryManager(
                 data_loader=training_data,
                 max_physical_batch_size=max_physical_batch_size,
@@ -409,38 +356,33 @@ class FederatedModel(ABC, Generic[TDestination]):
                         data = data[0]
                     data, target = data.to(self.device), target.to(self.device)
                     outputs = self.net(data)
-                    _, predicted = torch.max(outputs.data, 1)
-                    correct = (predicted == target).float().sum()
-
                     loss = criterion(outputs, target)
-                    running_loss += loss.item()
-                    total_correct += correct
-                    total += target.size(0)
-
-                    self.optimizer.zero_grad()
-                    self.net.zero_grad()
                     loss.backward()
                     self.optimizer.step()
                     self.optimizer.zero_grad()
-                    self.net.zero_grad()
+                    _, predicted = torch.max(outputs.data, 1)
+
+                    total_correct += (predicted == target).float().sum()
+                    total += target.size(0)
+                    losses.append(loss.item())
 
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
 
-            loss = running_loss / len(training_data)
+            train_loss = np.mean(losses)
             accuracy = total_correct / total
-            logger.info(f"Training loss: {loss}, accuracy: {accuracy}")
+            logger.info(f"Training loss: {train_loss}, accuracy: {accuracy} - total_correct = {total_correct}, total = {total}")
 
             if self.node_name != "server":
                 epsilon = self.privacy_engine.accountant.get_epsilon(
-                    delta=self.preferences.hyperparameters["DELTA"],
+                    delta=self.preferences.hyperparameters_config.delta,
                 )
                 noise_multiplier = self.optimizer.noise_multiplier
                 logger.info(
                     f"noise_multiplier: {noise_multiplier} - epsilon: {epsilon}"
                 )
 
-            return loss, accuracy, epsilon, noise_multiplier
+            return train_loss, accuracy, epsilon, noise_multiplier
 
         raise NotYetInitializedFederatedLearningError
 
@@ -468,20 +410,20 @@ class FederatedModel(ABC, Generic[TDestination]):
                 with torch.no_grad():
                     for data, target in self.testloader:
                         data, target = data.to(self.device), target.to(self.device)
-                        output = self.net(data)
+                        outputs = self.net(data)
                         total += target.size(0)
-                        test_loss = criterion(output, target).item()
+                        test_loss = criterion(outputs, target).item()
                         losses.append(test_loss)
-                        pred = output.argmax(dim=1, keepdim=True)
-                        correct += pred.eq(target.view_as(pred)).sum().item()
-                        y_pred.append(pred)
-                        y_true.append(target)
+                        predicted = outputs.argmax(dim=1, keepdim=True)
+                        correct += predicted.eq(target.view_as(predicted)).sum().item()
+                        y_pred.extend(predicted)
+                        y_true.extend(target)
 
                 test_loss = np.mean(losses)
                 accuracy = correct / total
 
-                y_true = [item.item() for sublist in y_true for item in sublist]
-                y_pred = [item.item() for sublist in y_pred for item in sublist]
+                y_true = [item.item() for item in y_true]
+                y_pred = [item.item() for item in y_pred]
 
                 f1score = f1_score(y_true, y_pred, average="macro")
                 precision = precision_score(y_true, y_pred, average="macro")
@@ -490,6 +432,8 @@ class FederatedModel(ABC, Generic[TDestination]):
                 cm = confusion_matrix(y_true, y_pred)
                 cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
                 accuracy_per_class = cm.diagonal()
+
+                print(f"---> TEST SET: accuracy: {accuracy}")
 
                 return (
                     test_loss,
@@ -514,24 +458,22 @@ class FederatedModel(ABC, Generic[TDestination]):
             Exception: Preference is not initialized
         """
         if self.preferences:
-            max_grad_norm = self.preferences.hyperparameters["max_grad_norm"]
-            delta = self.preferences.hyperparameters["DELTA"]
-            differential_privacy_p2p = self.preferences.p2p_config[
-                "differential_privacy_pre_training_cluster"
-            ]
+            max_grad_norm = self.preferences.hyperparameters_config.max_grad_norm
+            delta = self.preferences.hyperparameters_config.delta
+            differential_privacy_p2p = self.preferences.p2p_config.differential_privacy
 
             if self.preferences.hyperparameters.get("epsilon_per_round", None):
                 epochs = (
-                    self.preferences.server_config["local_training_epochs_with_server"]
+                    self.preferences.server_config.local_training_epochs
                     if phase == Phase.SERVER
-                    else self.preferences.p2p_config["local_training_epochs_in_cluster"]
+                    else self.preferences.p2p_config.local_training_epochs
                 )
             else:
                 epochs = (
-                    self.preferences.server_config["FL_rounds_with_server"]
-                    + self.preferences.p2p_config["FL_rounds_cluster"]
+                    self.preferences.server_config.fl_rounds
+                    + self.preferences.p2p_config.fl_rounds
                     if differential_privacy_p2p
-                    else self.preferences.server_config["FL_rounds_with_server"]
+                    else self.preferences.server_config.fl_rounds
                 )
 
             if not epochs:
@@ -578,7 +520,7 @@ class FederatedModel(ABC, Generic[TDestination]):
         else:
             raise NotYetInitializedPreferencesError
 
-    def init_privacy_with_noise(self, phase: Phase, noise_multiplier: float) -> None:
+    def init_privacy_with_noise(self, phase: Phase, noise_multiplier: float, clipping: float = None) -> None:
         """Initialize differential privacy using the noise parameter
         without the epsilon parameter.
         Noise multiplier: the more is higher the more is the noise
@@ -586,7 +528,7 @@ class FederatedModel(ABC, Generic[TDestination]):
 
         Args:
             phase (Phase): phase of the training
-            noise_multiplier: float: noise that we want to add 
+            noise_multiplier: float: noise that we want to add
                 every time we touch the data
         Raises:
             Exception: Preference is not initialized
@@ -601,7 +543,7 @@ class FederatedModel(ABC, Generic[TDestination]):
             )
 
         if self.preferences:
-            max_grad_norm = self.preferences.hyperparameters["max_grad_norm"]
+            max_grad_norm = self.preferences.hyperparameters_config.max_grad_norm
             if self.privacy_engine:
                 self.net.train()
                 (
@@ -613,7 +555,7 @@ class FederatedModel(ABC, Generic[TDestination]):
                     optimizer=self.optimizer,
                     data_loader=training_data,
                     noise_multiplier=noise_multiplier,
-                    max_grad_norm=max_grad_norm,
+                    max_grad_norm=max_grad_norm if not clipping else clipping,
                 )
                 if self.trainloader:
                     self.trainloader = train_loader
@@ -642,35 +584,35 @@ class FederatedModel(ABC, Generic[TDestination]):
             self.diff_privacy_initialized = True
             self.privacy_engine = PrivacyEngine(accountant="rdp")
             noise_multiplier = None
+            epsilon = None
             # We can initialize the private model using noise multiplier or
             # using the epsilon. In the experiments we used the noise multiplier
             # because using this we can have a better control of the privacy
             # budget spent during the training of the model
-            if phase == Phase.P2P:
+            if phase == Phase.P2P and self.preferences.p2p_config.differential_privacy:
+                epsilon = self.preferences.p2p_config.epsilon
+                noise_multiplier = self.preferences.p2p_config.noise_multiplier
+            elif phase == Phase.SERVER and self.preferences.server_config.differential_privacy:
                 epsilon = self.preferences.server_config.epsilon
                 noise_multiplier = self.preferences.server_config.noise_multiplier
-            else:
-                epsilon = self.preferences.hyperparameters.get(
-                    "EPSILON",
-                    self.preferences.hyperparameters.get("epsilon_per_round", None),
-                )
-                noise_multiplier = self.preferences.hyperparameters.get(
-                    "noise_multiplier",
-                    0,
-                )
+
             self.net.train()
             if epsilon:
                 # If we specify an epsilon, we have to use it during the
                 # iterations and the noise will depend on the epsilon
                 self.init_privacy_with_epsilon(phase=phase, epsilon=epsilon)
-            elif noise_multiplier:
+            elif noise_multiplier: 
                 self.init_privacy_with_noise(
                     phase=phase,
                     noise_multiplier=noise_multiplier,
                 )
             else:
-                raise Exception("Epsilon or noise multiplier not initialized")
-                
+                self.init_privacy_with_noise(
+                    phase=phase,
+                    noise_multiplier=0,
+                    clipping=1000000000
+                )
+
             if self.trainloader:
                 return self.net, self.optimizer, self.trainloader
             if phase.SERVER:

@@ -480,7 +480,6 @@ class TestFederatedModel:
         )
 
         with pytest.raises(Exception):
-
             federated_model.train()
 
     @staticmethod

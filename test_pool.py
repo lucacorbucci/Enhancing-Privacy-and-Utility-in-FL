@@ -1,7 +1,7 @@
-import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from time import perf_counter, sleep
 
+import multiprocess
 from multiprocess import Manager, Process, Queue
 
 from pistacchio_simulator.Components.federated_node import FederatedNode
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     # create a process pool
     nodes = [Node(i) for i in range(10)]
     server = Server()
-    m = multiprocessing.Manager()
+    m = multiprocess.Manager()
     server_channel = m.Queue()
 
     server.set_server_channel(server_channel)

@@ -1,4 +1,4 @@
-class InvalidDatasetErrorNameError(Exception):
+class InvalidDatasetNameError(Exception):
     """This exception is raised when the dataset name is not valid.
 
     Args:

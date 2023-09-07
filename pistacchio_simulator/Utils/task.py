@@ -12,7 +12,7 @@ class TaskType(Enum):
 class Task:
     """Definition of a task we want to perform."""
 
-    def __init__(self, task: str) -> None:
+    def __init__(self, task_name: str) -> None:
         """Initialization of the class Task.
         We need to split the task specified in the json file in two parts
         the first part is the name of the task (federatedlearning, contribution, fairness)
@@ -23,14 +23,12 @@ class Task:
         Args:
             task (str): task we want to perform taken from the json file
         """
-        splitted_task = task.split("_")
-        task_name = splitted_task[0]
-        task_info = task.split("_")[1] if len(splitted_task) > 1 else None
 
         if task_name == "federatedlearning":
             self.task_type = TaskType.FEDERATEDLEARNING
-        elif task_name == "contribution":
-            self.task_type = TaskType.CONTRIBUTION
-        elif task_name == "fairness":
-            self.task_type = TaskType.FAIRNESS
-        self.task_info = task_info
+        # elif task_name == "contribution":
+        #     self.task_type = TaskType.CONTRIBUTION
+        # elif task_name == "fairness":
+        #     self.task_type = TaskType.FAIRNESS
+        else:
+            raise NotImplementedError("Task not implemented")

@@ -56,7 +56,6 @@ class FederatedNode:
         self.message_counter = 0
         self.federated_model = None
 
-
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
 
@@ -89,7 +88,7 @@ class FederatedNode:
             FederatedModel: _description_
         """
         federated_model: FederatedModel = FederatedModel(
-            dataset_name=self.preferences.dataset_name,
+            dataset_name=self.preferences.dataset,
             node_name=self.node_id,
             preferences=self.preferences,
         )
@@ -100,6 +99,7 @@ class FederatedNode:
     def local_training(
         self,
         differential_private_train: bool,
+        phase: Phase,
     ) -> dict:
         """_summary_.
 
@@ -112,14 +112,13 @@ class FederatedNode:
             dict: _description_
         """
         epsilon = None
-        if differential_private_train:
-            (
-                loss,
-                accuracy,
-                epsilon,
-            ) = self.federated_model.train_with_differential_privacy()
-        else:
-            loss, accuracy = self.federated_model.train()
+        (
+            loss,
+            accuracy,
+            epsilon,
+            noise_multiplier,
+        ) = self.federated_model.train_with_differential_privacy(phase=phase)
+        
         return {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
 
     def send_and_receive_weights_with_server(
@@ -193,7 +192,7 @@ class FederatedNode:
         """
         epochs = range(
             1,
-            self.preferences.hyperparameters["fl_rounds"] + 1,
+            self.preferences.server_config.fl_rounds + 1,
         )
 
         performances = {}
@@ -240,9 +239,7 @@ class FederatedNode:
         # self.receive_starting_model_from_server(federated_model=federated_model)
         # logger.debug(f"Node {self.node_id} received starting model from server")
 
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
+        differential_private_train = self.preferences.server_config.differential_privacy
 
         # Initialize differential privacy if needed
         # if differential_private_train:
@@ -252,6 +249,7 @@ class FederatedNode:
 
     def train_local_model(
         self,
+        phase: Phase,
         # results: dict | None = None,
     ) -> tuple[list[float], list[float], list[float]]:
         """This function starts the server phase of the federated learning.
@@ -271,23 +269,21 @@ class FederatedNode:
         accuracy_list: list[float] = []
         epsilon_list: list[float] = []
 
-        local_epochs = self.preferences.server_config["local_epochs"]
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
+        local_epochs = self.preferences.server_config.local_training_epochs
+        differential_private_train = self.preferences.server_config.differential_privacy
 
         for _ in range(local_epochs):
             metrics = self.local_training(
                 differential_private_train,
+                phase=phase,
             )
             loss_list.append(metrics["loss"])
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
 
-        logger.debug("2")
         return Weights(
             weights=self.federated_model.get_weights(),
             sender=self.node_id,
             epsilon=metrics["epsilon"],
-        )
+        ), metrics
