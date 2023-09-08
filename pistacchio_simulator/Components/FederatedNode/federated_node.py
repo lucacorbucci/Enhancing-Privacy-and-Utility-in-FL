@@ -1,17 +1,33 @@
+import os
 import sys
 import time
+from collections import Counter
+from pathlib import Path
 from typing import Any, Mapping, TypeVar
 
+import dill
+import numpy as np
+import torch
 from loguru import logger
-from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
+from opacus import PrivacyEngine
+from opacus.utils.batch_memory_manager import BatchMemoryManager
+from pistacchio_simulator.Exceptions.errors import (
+    InvalidDatasetNameError,
+    NotYetInitializedFederatedLearningError,
+    NotYetInitializedPreferencesError,
+    NotYetInitializedServerChannelError,
+)
 from pistacchio_simulator.Models.federated_model import FederatedModel
 from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
+from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.end_messages import Message
+from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.performances import Performances
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.weights import Weights
-from torch import Tensor, nn
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from torch import Tensor, nn, optim
 
 logger.remove()
 logger.add(
@@ -32,11 +48,11 @@ class FederatedNode:
     def __init__(
         self,
         node_id: str,
-        preferences: Preferences,
         cluster_id: str,
-        # server_channel: CommunicationChannel,
-        # logging_queue: CommunicationChannel,
-        # receiver_channel: CommunicationChannel | None = None,
+        node_name: str,
+        preferences: Preferences,
+        phase: Phase,
+        model: FederatedModel,
     ) -> None:
         """Init the Federated Node.
 
@@ -49,12 +65,48 @@ class FederatedNode:
         """
         self.node_id = node_id
         self.cluster_id = cluster_id
-        # self.logging_queue = logging_queue
         self.preferences = preferences
         self.mode = "federated"
         self.mixed = False
         self.message_counter = 0
-        self.federated_model = None
+        self.federated_model = model
+        self.node_name = node_name
+        self.node_folder_path = (
+            f"../data/{self.preferences.dataset}/nodes_data/{self.node_name}/"
+        )
+        self.load_data()
+        self.load_privacy_engine()
+        self.init_differential_privacy(phase=phase)
+
+    def load_data(self):
+        if self.preferences.public_private_experiment and self.phase == Phase.P2P:
+            self.train_loader = DataLoader().load_splitted_dataset(
+                f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_public_train.pt",
+            )
+        elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
+            self.train_loader = DataLoader().load_splitted_dataset(
+                f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_private_train.pt",
+            )
+        else:
+            self.train_loader = DataLoader().load_splitted_dataset(
+                f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_train.pt",
+            )
+        self.test_set = DataLoader().load_splitted_dataset(
+            f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_test.pt",
+        )
+
+    def load_privacy_engine(self):
+        self.privacy_engine = None
+
+        # If we already used this client we need to load the state regarding
+        # the private model
+        if os.path.exists(f"{self.node_folder_path}privacy_engine.pkl"):
+            logger.info(f"Loading Privacy Engine on node {self.node_name}")
+            with open(f"{self.node_folder_path}privacy_engine.pkl", "rb") as file:
+                self.privacy_engine = dill.load(file)
+
+        if not self.privacy_engine:
+            self.privacy_engine = PrivacyEngine(accountant="rdp")
 
     def send_weights_to_server(self, weights: Weights) -> None:
         """This function is used to send the weights of the nodes to the server.
@@ -77,49 +129,84 @@ class FederatedNode:
         """
         self.server_channel = server_channel
 
-    def init_federated_model(self, model: nn.Module) -> FederatedModel:
-        """Initialize the federated learning model.
-
-        Args:
-            model (_type_): _description_
-
-        Returns
-        -------
-            FederatedModel: _description_
-        """
-        federated_model: FederatedModel = FederatedModel(
-            dataset_name=self.preferences.dataset,
-            node_name=self.node_id,
-            preferences=self.preferences,
-        )
-        federated_model.init_model(net=model)
-
-        return federated_model
-
-    def local_training(
+    def load_data(
         self,
-        differential_private_train: bool,
-        phase: Phase,
-    ) -> dict:
-        """_summary_.
-
-        Args:
-            differential_private_train (bool): _description_
-            federated_model (FederatedModel): _description_
+    ) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+        """Load training and test dataset.
 
         Returns
         -------
-            dict: _description_
+            Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]: training and test set
+
+        Raises
+        ------
+            Exception: Preference is not initialized
         """
-        epsilon = None
-        (
-            loss,
-            accuracy,
-            epsilon,
-            noise_multiplier,
-        ) = self.federated_model.train_with_differential_privacy(phase=phase)
-        
-        return {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
+
+        if self.preferences:
+            batch_size = self.preferences.hyperparameters_config.batch_size
+            if self.preferences.public_private_experiment:
+                self.trainloader_private = torch.utils.data.DataLoader(
+                    self.server_dataset,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    num_workers=8,
+                )
+                self.trainloader_public = torch.utils.data.DataLoader(
+                    self.p2p_dataset,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    num_workers=8,
+                )
+                self.trainloader = None
+            else:
+                self.trainloader = torch.utils.data.DataLoader(
+                    self.training_set,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    num_workers=8,
+                )
+
+            self.testloader = torch.utils.data.DataLoader(
+                self.test_set,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=8,
+            )
+
+            if self.preferences and self.preferences.debug:
+                if self.trainloader:
+                    self.print_data_stats(self.trainloader)
+                else:
+                    # One call is enough because we are summing
+                    # the size of the two datasets
+                    self.print_data_stats(self.trainloader_public)
+        else:
+            raise NotYetInitializedPreferencesError
+
+    def print_data_stats(self, trainloader: torch.utils.data.DataLoader) -> None:
+        """Debug function used to print stats about the loaded datasets.
+
+        Args:
+            trainloader (torch.utils.data.DataLoader): training set
+        """
+        if self.training_set:
+            num_examples = {
+                "trainset": len(self.training_set),
+                "testset": len(self.test_set),
+            }
+        else:
+            num_examples = {
+                "trainset": len(self.server_dataset) + len(self.p2p_dataset),
+                "testset": len(self.test_set),
+            }
+        targets = []
+        for _, data in enumerate(trainloader, 0):
+            targets.append(data[1])
+        targets = [item.item() for sublist in targets for item in sublist]
+        logger.info(f"{self.node_name}, {Counter(targets)}")
+        logger.info(f"Training set size: {num_examples['trainset']}")
+        logger.info(f"Test set size: {num_examples['testset']}")
 
     def send_and_receive_weights_with_server(
         self,
@@ -224,29 +311,6 @@ class FederatedNode:
         received_weights = self.receive_data_from_server()
         federated_model.update_weights(received_weights)
 
-    def start_node(self, model: nn.Module) -> None:
-        """This method implements all the logic of the federated node.
-        It starts the training of the model and then sends the weights to the
-        server.
-        Then, after the end of the training, it sends the performances of the
-        node to the main thread.
-
-        Args:
-            model (_type_): Model that we want to use during the federated learning
-        """
-        logger.debug(f"Starting node {self.node_id}")
-        self.federated_model = self.init_federated_model(model)
-        # self.receive_starting_model_from_server(federated_model=federated_model)
-        # logger.debug(f"Node {self.node_id} received starting model from server")
-
-        differential_private_train = self.preferences.server_config.differential_privacy
-
-        # Initialize differential privacy if needed
-        # if differential_private_train:
-        #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
-        #     logger.debug(f"Node {self.node_id} initialized differential privacy")
-        logger.debug(f"Node {self.node_id} started")
-
     def train_local_model(
         self,
         phase: Phase,
@@ -271,19 +335,93 @@ class FederatedNode:
 
         local_epochs = self.preferences.server_config.local_training_epochs
         differential_private_train = self.preferences.server_config.differential_privacy
+        epsilon = None
 
         for _ in range(local_epochs):
             metrics = self.local_training(
                 differential_private_train,
                 phase=phase,
             )
+            (
+                loss,
+                accuracy,
+                epsilon,
+                noise_multiplier,
+            ) = Learning.train(phase=phase)
+
+            metrics = {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
+
             loss_list.append(metrics["loss"])
             accuracy_list.append(metrics["accuracy"])
             if metrics.get("epsilon", None):
                 epsilon_list.append(metrics["epsilon"])
 
-        return Weights(
-            weights=self.federated_model.get_weights(),
-            sender=self.node_id,
-            epsilon=metrics["epsilon"],
-        ), metrics
+        # We need to store the state of the privacy engine and all the
+        # details about the private training
+
+        Path.mkdir(
+            self.node_folder_path,
+            parents=True,
+        )
+        with open(f"{self.node_folder_path}/privacy_engine.pkl", "wb") as f:
+            dill.dump(self.privacy_engine.accountant, f)
+
+        return (
+            Weights(
+                weights=self.federated_model.get_weights(),
+                sender=self.node_id,
+                epsilon=metrics["epsilon"],
+            ),
+            metrics,
+        )
+
+    def init_differential_privacy(self, phase: Phase):
+        epsilon = None
+        noise_multiplier = None
+        clipping = self.preferences.hyperparameters_config.max_grad_norm
+        epsilon = (
+            self.preferences.p2p_config.epsilon
+            if phase == Phase.P2P and self.preferences.p2p_config.differential_privacy
+            else self.preferences.server_config.epsilon
+        )
+        noise_multiplier = (
+            self.preferences.p2p_config.noise_multiplier
+            if phase == Phase.P2P and self.preferences.p2p_config.differential_privacy
+            else self.preferences.server_config.noise_multiplier
+        )
+
+        train_loader = (
+            self.trainloader_public
+            if phase == Phase.P2P and self.preferences.p2p_config.differential_privacy
+            else self.trainloader_private
+        )
+        if epsilon:
+            (
+                self.optimizer,
+                self.train_loader,
+                self.privacy_engine,
+            ) = self.federated_model.init_privacy_with_epsilon(
+                phase=phase,
+                epsilon=epsilon,
+                clipping=clipping,
+                train_loader=train_loader,
+                privacy_engine=self.privacy_engine,
+                optimizer=self.optimizer,
+                epochs=self.preferences.p2p_config.local_training_epochs
+                if phase.P2P
+                else self.preferences.server_config.local_training_epochs,
+                delta=self.preferences.hyperparameters_config.delta,
+            )
+        elif noise_multiplier:
+            (
+                self.optimizer,
+                self.train_loader,
+                self.privacy_engine,
+            ) = self.federated_model.init_privacy_with_epsilon(
+                phase=phase,
+                noise_multiplier=epsilon,
+                clipping=clipping,
+                train_loader=train_loader,
+                privacy_engine=self.privacy_engine,
+                optimizer=self.optimizer,
+            )
