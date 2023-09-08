@@ -2,9 +2,11 @@ import copy
 import random
 import sys
 from collections import Counter
+from dataclasses import dataclass
 from typing import Any
-import numpy as np 
+
 import multiprocess
+import numpy as np
 import torch
 from loguru import logger
 from multiprocess import set_start_method
@@ -24,20 +26,31 @@ logger.add(
 )
 
 
-def start_nodes(node, model):
-    new_node = copy.deepcopy(node)
-    new_node.federated_model = new_node.init_federated_model(model)
+# def start_nodes(node, model):
+#     new_node = copy.deepcopy(node)
+#     new_node.federated_model = new_node.init_federated_model(model)
 
-    return new_node
+#     return new_node
 
 
-def start_train(node, phase):
-
-    if not node.federated_model.diff_privacy_initialized:
-        print(f"INIZIALIZZO DI NUOVO {node.federated_model.diff_privacy_initialized}")
-        node.federated_model.init_differential_privacy(phase=phase)
+def start_train(node, phase, preferences, model):
+    node = FederatedNode(
+        node_id=node.node_id,
+        node_name=node.node_name,
+        cluster_id=node.cluster_id,
+        preferences=preferences,
+        phase=phase,
+        model=model,
+    )
     weights, metrics = node.train_local_model(phase)
     return (node, node.node_id, node.cluster_id, weights, metrics)
+
+
+@dataclass(frozen=True, eq=True)
+class NodeInfo:
+    node_name: str
+    node_id: int
+    cluster_id: int
 
 
 class Orchestrator:
@@ -64,17 +77,16 @@ class Orchestrator:
         self.fl_rounds_p2p = preferences.p2p_config.fl_rounds
         self.p2p_training = True if preferences.p2p_config else None
         self.total_epsilon = 0
+        self.model_weights = None
         set_start_method("spawn")
+        self.p2p_weights = {}
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
         self.federated_model = self.create_model()
-        self.nodes = self.create_nodes()
-        self.start_nodes()
 
-        if self.p2p_training:
-            grouped_nodes = self.group_nodes()
-        
+        self.nodes = self.create_nodes()
+
         # We want to be sure that the number of nodes that we
         # sample at each iteration is always less or equal to the
         # total number of nodes.
@@ -83,7 +95,15 @@ class Orchestrator:
             self.wandb = Utils.configure_wandb(
                 group="Orchestrator", preferences=self.preferences
             )
-        self.orchestrate_nodes(grouped_nodes=grouped_nodes)
+        if self.p2p_phase:
+            # In this case we want to perform a P2P training
+            self.orchestrate_nodes(phase=Phase.P2P)
+
+        if self.server_phase:
+            # In this case we want to perform a server training
+            self.orchestrate_nodes(phase=Phase.SERVER)
+        logger.debug("Training finished")
+
         if self.preferences.wandb:
             Utils.finish_wandb(wandb_run=self.wandb)
 
@@ -99,52 +119,20 @@ class Orchestrator:
         nodes = []
         for cluster_id in range(self.preferences.data_split_config.num_clusters):
             for node_id in range(self.preferences.data_split_config.num_nodes):
-                new_node = FederatedNode(
-                    node_id=f"{node_id}_cluster_{cluster_id}",
-                    preferences=self.preferences,
-                    cluster_id=cluster_id,
-                )
-                nodes.append(new_node)
+                node_name = f"cluster_{cluster_id}_node_{node_id}"
+                nodes.append(NodeInfo(node_name, node_id, cluster_id))
 
         return nodes
 
-    def group_nodes(self) -> dict[str, list[FederatedNode]]:
-        """This function groups the nodes by cluster_id.
-
-        Returns
-            dict[str, list[FederatedNode]]: a dictionary where the
-                key is the cluster_id and the value is a list of nodes
-                that belong to that cluster.
-        """
-        grouped_nodes = {}
-        for node in self.nodes:
-            if node.cluster_id not in grouped_nodes:
-                grouped_nodes[node.cluster_id] = []
-            grouped_nodes[node.cluster_id].append(node)
-
-        return grouped_nodes
-
-    def start_nodes(self) -> None:
-        logger.debug("Starting nodes...")
-        model_list = [copy.deepcopy(self.model) for _ in range(len(self.nodes))]
-
-        with multiprocess.Pool(self.pool_size) as pool:
-            results = [
-                pool.apply_async(start_nodes, (node, model))
-                for node, model in zip(self.nodes, model_list)
-            ]
-            self.nodes = []
-            for result in results:
-                node = result.get()
-                self.nodes.append(node)
-
-        logger.debug("Nodes started")
-
-    def orchestrate_p2p_phase(self, grouped_nodes: dict[str, list[FederatedNode]]):
-        logger.info(f"Orchestrating P2P phase - {self.fl_rounds_p2p} Iterations")
+    def orchestrate_nodes(self, phase: Phase) -> None:
+        logger.info(
+            f"Orchestrating {phase} phase - {self.fl_rounds_p2p if phase == Phase.P2P else self.fl_rounds_server} Iterations"
+        )
+        iterations = self.fl_rounds_p2p if phase == Phase.P2P else self.fl_rounds_server
         all_nodes = self.nodes
+        metrics = []
 
-        for iteration in range(self.fl_rounds_p2p):
+        for iteration in range(iterations):
             nodes_to_select = copy.copy(all_nodes)
             all_nodes = []
             logger.info(f"Iteration {iteration}")
@@ -153,50 +141,30 @@ class Orchestrator:
                 while len(nodes_to_select) > 0:
                     to_select = min(self.sampled_nodes, len(nodes_to_select))
                     sampled_nodes = random.sample(nodes_to_select, to_select)
+                    node_models = []
+                    for node in sampled_nodes:
+                        node_model = copy.deepcopy(self.model)
+                        if phase == Phase.P2P and self.p2p_weights:
+                            weights_model = self.p2p_weights
+                        else:
+                            weights_model = self.federated_model.get_weights()
 
-                    nodes_to_select = [node for node in nodes_to_select if node not in sampled_nodes]
-                
+                        node_federated_model = FederatedModel(
+                            dataset_name=self.preferences.dataset,
+                            node_name=node.node_name,
+                            model=node_model,
+                            preferences=self.preferences,
+                        )
+                        node_federated_model.update_weights(weights_model)
+                        node_models.append(node_federated_model)
+                    nodes_to_select = list(set(nodes_to_select) - set(sampled_nodes))
+
                     results = [
-                        pool.apply_async(start_train, (node, Phase.P2P))
-                        for node in sampled_nodes
-                    ]
-
-                    count = 0
-                    for result in results:
-                        count += 1
-                        node, node_id, cluster_id, model_weights, metric = result.get()
-                        all_nodes.append(node)
-                        if cluster_id not in weights:
-                            weights[cluster_id] = {}
-                        weights[cluster_id][node_id] = copy.deepcopy(model_weights.weights)
-
-            for cluster_id in weights:
-                avg = Utils.compute_average(weights[cluster_id])
-                for node in self.nodes:
-                    if node.cluster_id == cluster_id:
-                        node.federated_model.update_weights(avg)
-            logger.debug("Computed the average")
-
-    def orchestrate_server_phase(self):
-        logger.info("Orchestrating Server phase...")
-
-        metrics = []
-        all_nodes = self.nodes
-
-        for iteration in range(self.fl_rounds_server):
-            nodes_to_select = copy.copy(all_nodes)
-            logger.info(f"Iterazione {iteration}")
-            all_nodes = []
-            weights = {}
-            with multiprocess.Pool(self.pool_size) as pool:
-                while len(nodes_to_select) > 0:
-                    to_select = min(self.sampled_nodes, len(nodes_to_select))
-                    sampled_nodes = random.sample(nodes_to_select, to_select)
-                    # remove the sampled nodes from the list of nodes to be selected
-                    nodes_to_select = [node for node in nodes_to_select if node not in sampled_nodes]
-                    results = [
-                        pool.apply_async(start_train, (node, Phase.SERVER))
-                        for node in sampled_nodes
+                        pool.apply_async(
+                            start_train,
+                            (node, Phase.P2P, self.preferences, model),
+                        )
+                        for node, model in zip(sampled_nodes, node_models)
                     ]
 
                     count = 0
@@ -205,44 +173,98 @@ class Orchestrator:
                         node, node_id, cluster_id, model_weights, metric = result.get()
                         all_nodes.append(node)
 
-                        weights[node_id] = copy.deepcopy(model_weights.weights)
-                        metrics.append(metric)
+                        if phase == Phase.P2P:
+                            if cluster_id not in weights:
+                                weights[cluster_id] = {}
+                            weights[cluster_id][node_id] = copy.deepcopy(
+                                model_weights.weights
+                            )
+                        else:
+                            weights[node_id] = copy.deepcopy(model_weights.weights)
+                            metrics.append(metric)
 
+            if phase == Phase.P2P:
+                for cluster_id in weights:
+                    avg = Utils.compute_average(weights[cluster_id])
+                    self.p2p_weights["cluster_id"] = avg
+            else:
+                self.federated_model.update_weights(avg)
 
-            aggregated_training_accuracy = np.mean([metric["accuracy"].item() for metric in metrics])
-            aggregated_training_loss = np.mean([metric["loss"].item() for metric in metrics])
-            aggregated_epsilon = max([metric["epsilon"] for metric in metrics])
-
-            Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics={
-                "train loss": aggregated_training_loss,
-                "train accuracy": aggregated_training_accuracy,
-                "FL ROUND": iteration,
-                "EPSILON": aggregated_epsilon,
-            })
-            avg = Utils.compute_average(weights)
-            for node in self.nodes:
-                node.federated_model.update_weights(avg)
-            self.federated_model.update_weights(avg)
             logger.debug("Computed the average")
 
-            self.log_metrics(iteration=iteration)
-            logger.debug("Computed the average")
+    # def orchestrate_server_phase(self):
+    #     logger.info("Orchestrating Server phase...")
 
+    #     metrics = []
+    #     all_nodes = self.nodes
 
-    def orchestrate_nodes(
-        self,
-        grouped_nodes: dict[str, list[FederatedNode]] = None,
-    ) -> None:
-        logger.debug("Orchestrating nodes...")
+    #     for iteration in range(self.fl_rounds_server):
+    #         nodes_to_select = copy.copy(all_nodes)
+    #         logger.info(f"Iterazione {iteration}")
+    #         all_nodes = []
+    #         weights = {}
+    #         with multiprocess.Pool(self.pool_size) as pool:
+    #             while len(nodes_to_select) > 0:
+    #                 to_select = min(self.sampled_nodes, len(nodes_to_select))
+    #                 sampled_nodes = random.sample(nodes_to_select, to_select)
+    #                 for node in sampled_nodes:
+    #                     node_model = copy.deepcopy(self.model)
+    #                     node.load_data()
+    #                     node_federated_model = FederatedModel(
+    #                         dataset_name=self.preferences.dataset,
+    #                         node_name=node.node_id,
+    #                         model=node_model,
+    #                         preferences=self.preferences,
+    #                     )
+    #                     node_federated_model.update_weights = (
+    #                         self.federated_model.get_weights()
+    #                     )
 
-        if self.p2p_phase and grouped_nodes:
-            # In this case we want to perform a P2P training
-            self.orchestrate_p2p_phase(grouped_nodes)
+    #                     node.federated_model = node_federated_model
 
-        if self.server_phase:
-            # In this case we want to perform a server training
-            self.orchestrate_server_phase()
-        logger.debug("Training finished")
+    #                 # remove the sampled nodes from the list of nodes to be selected
+    #                 nodes_to_select = [
+    #                     node for node in nodes_to_select if node not in sampled_nodes
+    #                 ]
+    #                 results = [
+    #                     pool.apply_async(start_train, (node, Phase.SERVER))
+    #                     for node in sampled_nodes
+    #                 ]
+
+    #                 count = 0
+    #                 for result in results:
+    #                     count += 1
+    #                     node, node_id, cluster_id, model_weights, metric = result.get()
+    #                     all_nodes.append(node)
+
+    #                     weights[node_id] = copy.deepcopy(model_weights.weights)
+    #                     metrics.append(metric)
+
+    #         aggregated_training_accuracy = np.mean(
+    #             [metric["accuracy"].item() for metric in metrics]
+    #         )
+    #         aggregated_training_loss = np.mean(
+    #             [metric["loss"].item() for metric in metrics]
+    #         )
+    #         aggregated_epsilon = max([metric["epsilon"] for metric in metrics])
+
+    #         Utils.log_metrics_to_wandb(
+    #             wandb_run=self.wandb,
+    #             metrics={
+    #                 "train loss": aggregated_training_loss,
+    #                 "train accuracy": aggregated_training_accuracy,
+    #                 "FL ROUND": iteration,
+    #                 "EPSILON": aggregated_epsilon,
+    #             },
+    #         )
+    #         avg = Utils.compute_average(weights)
+    #         for node in self.nodes:
+    #             node.federated_model.update_weights(avg)
+    #         self.federated_model.update_weights(avg)
+    #         logger.debug("Computed the average")
+
+    #         self.log_metrics(iteration=iteration)
+    #         logger.debug("Computed the average")
 
     def log_metrics(self, iteration: int) -> None:
         logger.debug("Computing metrics...")
@@ -270,7 +292,7 @@ class Orchestrator:
             Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
         logger.debug("Metrics logged")
 
-    def create_model(self) -> None:
+    def create_model(self) -> FederatedModel:
         """This function creates and initialize the model that
         we'll use on the server for the validation.
         """
@@ -279,10 +301,10 @@ class Orchestrator:
         model = FederatedModel(
             dataset_name=self.preferences.dataset,
             node_name="server",
+            model=orchestrator_model,
             preferences=self.preferences,
         )
         if model:
-            model.init_model(net=orchestrator_model)
             model.trainloader = self.validation_set
             model.testloader = self.validation_set
 
