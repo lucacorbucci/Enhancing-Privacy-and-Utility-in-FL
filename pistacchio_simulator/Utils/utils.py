@@ -8,16 +8,63 @@ from typing import Any, Mapping, TypeVar
 import torch
 import wandb
 from dotenv import load_dotenv
-from torch import Tensor
-
+from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
+from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
+from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
-
+from torch import Tensor, nn
+from torchvision import models
 
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
 
 class Utils:
     """Define the Utils class."""
+
+    @staticmethod
+    def get_model(preferences: Preferences) -> nn.Module:
+        """This function is used to get the model.
+
+        Returns
+        -------
+            nn.Module: the model
+        """
+        model = None
+        if preferences.dataset == "mnist":
+            model = MnistNet()
+        elif preferences.dataset == "celeba":
+            model = CelebaNet()
+        elif preferences.dataset == "celeba_gender":
+            model = CelebaGenderNet()
+        elif preferences.dataset == "fashion_mnist":
+            model = FashionMnistNet()
+        elif preferences.dataset == "imaginette":
+            model = Utils.get_model_to_fine_tune()
+            preferences.fine_tuning = True
+        else:
+            raise InvalidDatasetNameError("Invalid dataset name")
+        return model
+
+    @staticmethod
+    def get_model_to_fine_tune() -> nn.Module:
+        """This function is used to get the model to fine tune.
+        In this case we use a pre trained EfficientNet B0 pre trained
+        on image net.
+
+        Returns
+        -------
+            nn.Module: the model to fine tune
+        """
+        model = models.efficientnet_b0(weights="IMAGENET1K_V1")
+
+        for name, param in model.named_parameters(recurse=True):
+            if not name.startswith("classifier"):
+                param.requires_grad = False
+
+        model.classifier[1] = nn.Linear(in_features=1280, out_features=10)
+
+        return model
 
     @staticmethod
     def compute_average(shared_data: dict) -> dict[Any, Any]:
@@ -49,6 +96,17 @@ class Utils:
         for key in results:
             results[key] = torch.div(results[key], len(models))
         return results
+
+    @staticmethod
+    def get_parameters(model):
+        return [val.cpu().numpy() for _, val in model.state_dict().items()]
+
+    @staticmethod
+    def set_params(model: torch.nn.ModuleList, params):
+        """Set model weights from a list of NumPy ndarrays."""
+        params_dict = zip(model.state_dict().keys(), params)
+        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        model.load_state_dict(state_dict, strict=True)
 
     @staticmethod
     def compute_distance_from_mean(shared_data: dict, average_weights: dict) -> dict:
@@ -103,7 +161,6 @@ class Utils:
         -------
             str: experiment name
         """
-        
 
         diff_private = (
             ""
@@ -153,9 +210,13 @@ class Utils:
         config_dictionary = {}
         config_dictionary["lr"] = preferences.hyperparameters_config.lr
         config_dictionary["batch_size"] = preferences.hyperparameters_config.batch_size
-        config_dictionary["max_phisical_batch_size"] = preferences.hyperparameters_config.max_phisical_batch_size
+        config_dictionary[
+            "max_phisical_batch_size"
+        ] = preferences.hyperparameters_config.max_phisical_batch_size
         config_dictionary["delta"] = preferences.hyperparameters_config.delta
-        config_dictionary["max_grad_norm"] = preferences.hyperparameters_config.max_grad_norm
+        config_dictionary[
+            "max_grad_norm"
+        ] = preferences.hyperparameters_config.max_grad_norm
         config_dictionary["num_nodes"] = preferences.data_split_config.num_nodes
         config_dictionary["num_clusters"] = preferences.data_split_config.num_clusters
 
@@ -163,16 +224,17 @@ class Utils:
             config_dictionary["fl_round_P2P"] = preferences.p2p_config.fl_rounds
         if preferences.server_config:
             config_dictionary["fl_round_SERVER"] = preferences.server_config.fl_rounds
-        
+
         wandb.init(
             project=preferences.wandb_config.project_name,
             entity=wandb_entity,
             config=config_dictionary,
             group=group,
             tags=preferences.wandb_config.tags,
+            name=preferences.wandb_config.name,
         )
-        if wandb.run:
-            wandb.run.name = Utils.get_run_name(preferences=preferences)
+        # if wandb.run:
+        #     wandb.run.name = Utils.get_run_name(preferences=preferences)
         return wandb
 
     @staticmethod

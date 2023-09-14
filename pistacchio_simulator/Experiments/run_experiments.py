@@ -1,45 +1,12 @@
-
 import torch
-from pydantic.tools import parse_obj_as
-from torch import nn
-
 from pistacchio_simulator.Components.Orchestrator.orchestrator import Orchestrator
-from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
-from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
-from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
-from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task, TaskType
+from pistacchio_simulator.Utils.utils import Utils
+from pydantic.tools import parse_obj_as
 
 
 class Experiment:
-    @staticmethod
-    def get_model(preferences: Preferences) -> nn.Module:
-        """This function is used to get the model.
-
-        Returns
-        -------
-            nn.Module: the model
-        """
-        model = None
-        if preferences.dataset == "mnist":
-            model = MnistNet()
-        elif preferences.dataset == "cifar10":
-            model = Experiment.get_model_to_fine_tune()
-            preferences.fine_tuning = True
-        elif preferences.dataset == "celeba":
-            model = CelebaNet()
-        elif preferences.dataset == "celeba_gender":
-            model = CelebaGenderNet()
-        elif preferences.dataset == "fashion_mnist":
-            model = FashionMnistNet()
-        elif preferences.dataset == "imaginette":
-            model = Experiment.get_model_to_fine_tune()
-            preferences.fine_tuning = True
-        else:
-            raise InvalidDatasetNameError("Invalid dataset name")
-        return model
-
     @staticmethod
     def run_federated_learning_experiment(preferences: Preferences) -> None:
         """Run a federated learning experiment.
@@ -47,7 +14,7 @@ class Experiment:
         Args:
             preferences (Preferences): _description_
         """
-        model = Experiment.get_model(preferences)
+        model = Utils.get_model(preferences)
 
         orchestrator = Orchestrator(
             preferences=preferences,
@@ -63,7 +30,7 @@ class Experiment:
             + 1
         )
         for iteration in range(iterations):
-            model = Experiment.get_model(preferences)
+            model = Utils.get_model(preferences)
 
             orchestrator = Orchestrator(
                 preferences=preferences, model=model, iteration=iteration
@@ -82,7 +49,7 @@ class Experiment:
         ------
             NotImplementedError: _description_
         """
-        model = Experiment.get_model(preferences)
+        model = Utils.get_model(preferences)
         Experiment.launch_classic_experiment(preferences, model)
 
     @staticmethod
@@ -103,7 +70,7 @@ class Experiment:
         """
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        
+
         # set_start_method("spawn")
         # torch.multiprocess.set_sharing_strategy("file_system")
 
