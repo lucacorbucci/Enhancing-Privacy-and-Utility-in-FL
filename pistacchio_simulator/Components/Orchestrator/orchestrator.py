@@ -150,7 +150,6 @@ class Orchestrator:
             f"Orchestrating {phase} phase - {self.fl_rounds_p2p if phase == Phase.P2P else self.fl_rounds_server} Iterations"
         )
         iterations = self.fl_rounds_p2p if phase == Phase.P2P else self.fl_rounds_server
-        metrics = []
 
         data_test = torch.load("../data/mnist/federated_data/server_validation_set.pt")
 
@@ -165,6 +164,7 @@ class Orchestrator:
 
         with multiprocess.Pool(self.pool_size) as pool:
             for iteration in range(iterations):
+                metrics_list = []
                 nodes_to_select = copy.deepcopy(self.nodes)
                 while len(nodes_to_select) > 0:
                     to_select = min(self.sampled_nodes, len(nodes_to_select))
@@ -189,16 +189,6 @@ class Orchestrator:
                         )
                         for node in sampled_nodes
                     ]
-                    # for result in results:
-                    #     (
-                    #         node,
-                    #         node_id,
-                    #         cluster_id,
-                    #         metrics,
-                    #         weights,
-                    #     ) = result.get()
-
-                    #     Utils.set_params(self.model, weights.weights)
 
                     for result in results:
                         (
@@ -217,20 +207,41 @@ class Orchestrator:
                             )
                         else:
                             ttt = copy.deepcopy(weights)
-                            metrics.append(metrics)
+                            metrics_list.append(metrics)
 
                 if phase == Phase.P2P:
                     for cluster_id in weights:
                         avg = Utils.compute_average(weights[cluster_id])
                         self.p2p_weights["cluster_id"] = avg
                 else:
-                    # print(weights)
+                    print(type(weights))
                     # avg = Utils.compute_average(weights)
                     Utils.set_params(self.model, ttt)
 
+                    aggregated_training_accuracy = np.mean(
+                        [metric["accuracy"].item() for metric in metrics_list]
+                    )
+                    aggregated_training_loss = np.mean(
+                        [metric["loss"].item() for metric in metrics_list]
+                    )
+                    aggregated_epsilon = max(
+                        [metric["epsilon"] for metric in metrics_list]
+                    )
+
+                    Utils.log_metrics_to_wandb(
+                        wandb_run=self.wandb,
+                        metrics={
+                            "Train loss": aggregated_training_loss,
+                            "Train accuracy": aggregated_training_accuracy,
+                            "Fl Round": iteration + self.fl_rounds_p2p,
+                            "EPSILON": aggregated_epsilon,
+                            "FL Round Server": iteration,
+                        },
+                    )
+
                 logger.debug("Computed the average")
                 if phase == Phase.SERVER:
-                    self.log_metrics(iteration=iteration)
+                    self.evaluate(iteration=iteration)
 
     def evaluate(self, iteration: int) -> None:
         logger.debug("Computing metrics...")
@@ -244,7 +255,7 @@ class Orchestrator:
             recall,
             test_accuracy_per_class,
         ) = Learning.evaluate_model(
-            federated_model=self.model,
+            model=self.model,
             test_loader=self.validation_set,
             device=self.device,
         )
