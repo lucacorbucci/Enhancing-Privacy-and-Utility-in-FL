@@ -206,16 +206,23 @@ class FederatedNode:
 
         optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0)
 
+        # (
+        #     private_model,
+        #     private_optimizer,
+        #     train_loader,
+        # ) = self.privacy_engine.make_private(
+        #     module=model,
+        #     optimizer=optimizer,
+        #     data_loader=self.train_loader,
+        #     noise_multiplier=1.0,
+        #     max_grad_norm=2.0,
+        # )
         (
             private_model,
             private_optimizer,
             train_loader,
-        ) = self.privacy_engine.make_private(
-            module=model,
-            optimizer=optimizer,
-            data_loader=self.train_loader,
-            noise_multiplier=1.0,
-            max_grad_norm=2.0,
+        ) = self.init_differential_privacy(
+            phase=phase, optimizer=optimizer, model=model
         )
         private_model.train()
 
@@ -233,6 +240,7 @@ class FederatedNode:
                 privacy_engine=self.privacy_engine,
                 train_loader=train_loader,
             )
+            metrics = {"loss": train_loss, "accuracy": accuracy, "epsilon": epsilon}
 
         # We need to store the state of the privacy engine and all the
         # details about the private training
@@ -247,10 +255,10 @@ class FederatedNode:
 
         return (
             Utils.get_parameters(model),
-            {},
+            metrics,
         )
 
-    def init_differential_privacy(self, phase: Phase):
+    def init_differential_privacy(self, phase: Phase, optimizer, model):
         logger.info(f"Initializing differential privacy for Phase {phase}")
 
         epsilon = None
@@ -272,36 +280,34 @@ class FederatedNode:
 
         if epsilon:
             logger.info(f"Initializing differential privacy with epsilon {epsilon}")
-            (
-                self.optimizer,
-                self.train_loader,
-                self.privacy_engine,
-            ) = self.federated_model.init_privacy_with_epsilon(
-                phase=phase,
-                epsilon=epsilon,
-                clipping=clipping,
-                train_loader=self.train_loader,
-                privacy_engine=self.privacy_engine,
-                optimizer=self.optimizer,
-                epochs=self.preferences.p2p_config.local_training_epochs
-                if phase.P2P
-                else self.preferences.server_config.local_training_epochs,
-                delta=self.preferences.hyperparameters_config.delta,
-            )
+
+            # (
+            #     self.net,
+            #     optimizer,
+            #     train_loader,
+            # ) = self.privacy_engine.make_private_with_epsilon(
+            #     module=self.net,
+            #     optimizer=self.optimizer,
+            #     data_loader=self.train_loader,
+            #     epochs=epochs,
+            #     target_epsilon=epsilon,
+            #     target_delta=delta,
+            #     max_grad_norm=clipping,
+            # )
         else:
             logger.info(
                 f"Initializing differential privacy with noise {noise_multiplier} and clipping {clipping}"
             )
 
             (
-                self.optimizer,
-                self.train_loader,
-                self.privacy_engine,
-            ) = self.federated_model.init_privacy_with_noise(
-                phase=phase,
+                private_model,
+                private_optimizer,
+                private_train_loader,
+            ) = self.privacy_engine.make_private(
+                module=model,
+                optimizer=optimizer,
+                data_loader=self.train_loader,
                 noise_multiplier=noise_multiplier,
-                clipping=clipping,
-                train_loader=self.train_loader,
-                privacy_engine=self.privacy_engine,
-                optimizer=self.optimizer,
+                max_grad_norm=clipping,
             )
+        return private_model, private_optimizer, private_train_loader
