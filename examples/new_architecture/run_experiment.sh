@@ -5,7 +5,7 @@ poetry run python ./generate_dataset.py --config private_1.json
 # poetry run python ./run_test.py --config baseline.json
 # poetry run python ./run_test.py --config private_1.json
 # poetry run python ./run_test.py --config private_2.json
-# poetry run python ./run_test.py --config p2p_private+privacy_server.json
+poetry run python ./run_test.py --config p2p+privacy_server.json
 
 # poetry run python ./run_test.py --config privacy_server.json
 # poetry run python ./run_test.py --config p2p+privacy_server.json

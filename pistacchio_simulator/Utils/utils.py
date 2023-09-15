@@ -2,19 +2,23 @@ import os
 import random
 import time
 from collections import OrderedDict
+from functools import reduce
 from types import ModuleType
 from typing import Any, Mapping, TypeVar
 
+import numpy as np
 import torch
 import wandb
 from dotenv import load_dotenv
+from torch import Tensor, nn
+from torchvision import models
+
 from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
 from pistacchio_simulator.Models.celeba import CelebaGenderNet, CelebaNet
 from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.preferences import Preferences
-from torch import Tensor, nn
-from torchvision import models
+
 
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
@@ -45,6 +49,30 @@ class Utils:
         else:
             raise InvalidDatasetNameError("Invalid dataset name")
         return model
+
+    def aggregate_weights(weights: list, num_examples_list: list) -> list:
+        """Compute weighted average.
+        This function is taken from
+        https://github.com/adap/flower/blob/0f725128e27fea7099726043f73cc2ce727e9fff/src/py/flwr/server/strategy/aggregate.py#L38
+        """
+
+        # Calculate the total number of examples used during training
+        num_examples_total = sum(
+            [num_examples for _, num_examples in zip(weights, num_examples_list)]
+        )
+
+        # Create a list of weights, each multiplied by the related number of examples
+        weighted_weights = [
+            [layer * num_examples for layer in weights]
+            for weights, num_examples in zip(weights, num_examples_list)
+        ]
+
+        # Compute average weights of each layer
+        weights_prime = [
+            reduce(np.add, layer_updates) / num_examples_total
+            for layer_updates in zip(*weighted_weights)
+        ]
+        return weights_prime
 
     @staticmethod
     def get_model_to_fine_tune() -> nn.Module:

@@ -205,18 +205,6 @@ class FederatedNode:
         Utils.set_params(model, self.weights)
 
         optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0)
-
-        # (
-        #     private_model,
-        #     private_optimizer,
-        #     train_loader,
-        # ) = self.privacy_engine.make_private(
-        #     module=model,
-        #     optimizer=optimizer,
-        #     data_loader=self.train_loader,
-        #     noise_multiplier=1.0,
-        #     max_grad_norm=2.0,
-        # )
         (
             private_model,
             private_optimizer,
@@ -256,6 +244,7 @@ class FederatedNode:
         return (
             Utils.get_parameters(model),
             metrics,
+            len(self.train_loader.dataset),
         )
 
     def init_differential_privacy(self, phase: Phase, optimizer, model):

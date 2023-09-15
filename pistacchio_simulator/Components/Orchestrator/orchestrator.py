@@ -12,13 +12,15 @@ import numpy as np
 import torch
 from loguru import logger
 from multiprocess import set_start_method
+from torch import nn
+
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-from torch import nn
+
 
 logger.remove()
 logger.add(
@@ -28,17 +30,17 @@ logger.add(
 )
 
 
-def start_train(phase, preferences, weights):
+def start_train(phase, preferences, weights, node_id, node_name, cluster_id):
     node = FederatedNode(
-        node_id=0,
-        node_name="cluster_0_node_0",
-        cluster_id=0,
+        node_id=node_id,
+        node_name=node_name,
+        cluster_id=cluster_id,
         preferences=preferences,
         phase=Phase.SERVER,
         weights=weights,
     )
-    weights, metrics = node.train_local_model(phase)
-    return (node, node.node_id, node.cluster_id, metrics, weights)
+    weights, metrics, num_examples = node.train_local_model(phase)
+    return (node, node.node_id, node.cluster_id, metrics, weights, num_examples)
 
 
 @dataclass(frozen=True, eq=True)
@@ -67,10 +69,7 @@ class Orchestrator:
         self.model = model
         self.federated_model = None
         self.validation_set = None
-        self.pool_size = (
-            preferences.data_split_config.num_nodes
-            * preferences.data_split_config.num_clusters
-        )
+        self.pool_size = self.preferences.pool_size
         self.p2p_phase = True if self.preferences.p2p_config else False
         self.server_phase = True if self.preferences.server_config else False
         self.sampled_nodes = self.preferences.pool_size
@@ -86,7 +85,6 @@ class Orchestrator:
         self.fl_rounds_p2p = preferences.p2p_config.fl_rounds if self.p2p_phase else 0
         self.p2p_training = True if preferences.p2p_config else None
         self.total_epsilon = 0
-        self.model_weights = None
         set_start_method("spawn")
         self.p2p_weights = {}
         self.store_path = f"../data/{self.preferences.dataset}/nodes_data/"
@@ -96,8 +94,6 @@ class Orchestrator:
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
-
-        # self.federated_model = self.create_model()
 
         self.nodes = self.create_nodes()
 
@@ -140,8 +136,9 @@ class Orchestrator:
         for cluster_id in range(self.preferences.data_split_config.num_clusters):
             for node_id in range(self.preferences.data_split_config.num_nodes):
                 node_name = f"cluster_{cluster_id}_node_{node_id}"
-
                 nodes.append(NodeInfo(node_name, node_id, cluster_id))
+            if self.p2p_phase:
+                self.p2p_weights[cluster_id] = Utils.get_parameters(self.model)
 
         return nodes
 
@@ -160,11 +157,15 @@ class Orchestrator:
             num_workers=0,
         )
         self.model.to("cuda:0")
-        weights = {}
+        
 
         with multiprocess.Pool(self.pool_size) as pool:
             for iteration in range(iterations):
                 metrics_list = []
+                all_weights = []
+                all_weights_p2p = {}
+                num_examples_list_p2p = {}
+                num_examples_list = []
                 nodes_to_select = copy.deepcopy(self.nodes)
                 while len(nodes_to_select) > 0:
                     to_select = min(self.sampled_nodes, len(nodes_to_select))
@@ -185,6 +186,9 @@ class Orchestrator:
                                 weights[node.cluster_id]
                                 if phase == Phase.P2P
                                 else weights,
+                                node.node_id,
+                                node.node_name,
+                                node.cluster_id,
                             ),
                         )
                         for node in sampled_nodes
@@ -197,26 +201,39 @@ class Orchestrator:
                             cluster_id,
                             metrics,
                             weights,
+                            num_examples,
                         ) = result.get()
 
                         if phase == Phase.P2P:
-                            if cluster_id not in weights:
-                                weights[cluster_id] = {}
-                            weights[cluster_id][node_id] = copy.deepcopy(
+                            if cluster_id not in all_weights_p2p:
+                                all_weights_p2p[cluster_id] = []
+                            all_weights_p2p[cluster_id].append(copy.deepcopy(
                                 weights,
-                            )
+                            ))
+                            if cluster_id not in num_examples_list_p2p:
+                                num_examples_list_p2p[cluster_id] = []
+                            num_examples_list_p2p[cluster_id].append(num_examples)
                         else:
-                            ttt = copy.deepcopy(weights)
+                            all_weights.append(weights)
+                            num_examples_list.append(num_examples)
                             metrics_list.append(metrics)
 
                 if phase == Phase.P2P:
-                    for cluster_id in weights:
-                        avg = Utils.compute_average(weights[cluster_id])
-                        self.p2p_weights["cluster_id"] = avg
+                    print(num_examples_list_p2p[cluster_id])
+
+                    for cluster_id in all_weights_p2p:
+                        aggregated_weights = Utils.aggregate_weights(
+                            all_weights_p2p[cluster_id],
+                            num_examples_list_p2p[cluster_id],
+                        )
+                        self.p2p_weights[cluster_id] = aggregated_weights
                 else:
-                    print(type(weights))
-                    # avg = Utils.compute_average(weights)
-                    Utils.set_params(self.model, ttt)
+                    aggregated_weights = Utils.aggregate_weights(
+                        all_weights,
+                        num_examples_list,
+                    )
+
+                    Utils.set_params(self.model, aggregated_weights)
 
                     aggregated_training_accuracy = np.mean(
                         [metric["accuracy"].item() for metric in metrics_list]
@@ -228,16 +245,17 @@ class Orchestrator:
                         [metric["epsilon"] for metric in metrics_list]
                     )
 
-                    Utils.log_metrics_to_wandb(
-                        wandb_run=self.wandb,
-                        metrics={
-                            "Train loss": aggregated_training_loss,
-                            "Train accuracy": aggregated_training_accuracy,
-                            "Fl Round": iteration + self.fl_rounds_p2p,
-                            "EPSILON": aggregated_epsilon,
-                            "FL Round Server": iteration,
-                        },
-                    )
+                    if self.preferences.wandb:
+                        Utils.log_metrics_to_wandb(
+                            wandb_run=self.wandb,
+                            metrics={
+                                "Train loss": aggregated_training_loss,
+                                "Train accuracy": aggregated_training_accuracy,
+                                "Fl Round": iteration + self.fl_rounds_p2p,
+                                "EPSILON": aggregated_epsilon,
+                                "FL Round Server": iteration,
+                            },
+                        )
 
                 logger.debug("Computed the average")
                 if phase == Phase.SERVER:
