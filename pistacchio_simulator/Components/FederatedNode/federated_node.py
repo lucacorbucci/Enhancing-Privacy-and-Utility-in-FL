@@ -9,6 +9,8 @@ import numpy as np
 import torch
 from loguru import logger
 from opacus import PrivacyEngine
+from torch import Tensor, nn
+
 from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.performances import Performances
@@ -16,7 +18,7 @@ from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
 from pistacchio_simulator.Utils.weights import Weights
-from torch import Tensor, nn
+
 
 logger.remove()
 logger.add(
@@ -96,7 +98,7 @@ class FederatedNode:
         self.message_counter = 0
         self.node_name = node_name
         self.node_folder_path = (
-            f"../data/{self.preferences.dataset}/nodes_data/{self.node_name}/"
+            f"{self.preferences.data_split_config.store_path}/nodes_data/{self.node_name}/"
         )
         self.load_data()
         gpus = preferences.gpu_config
@@ -124,22 +126,22 @@ class FederatedNode:
             # private training dataset even during the P2P phase
             if not self.preferences.p2p_config.differential_privacy:
                 self.train_set = DataLoader().load_splitted_dataset(
-                    f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_public_train.pt",
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_public_train.pt",
                 )
             else:
                 self.train_set = DataLoader().load_splitted_dataset(
-                    f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_private_train.pt",
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_private_train.pt",
                 )
         elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
             self.train_set = DataLoader().load_splitted_dataset(
-                f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_private_train.pt",
+                f"{self.preferences.data_split_config.store_path}/{self.node_name}_private_train.pt",
             )
         else:
             self.train_set = DataLoader().load_splitted_dataset(
-                f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_train.pt",
+                f"{self.preferences.data_split_config.store_path}/{self.node_name}_train.pt",
             )
         self.test_set = DataLoader().load_splitted_dataset(
-            f"../data/{self.preferences.dataset}/federated_data/{self.node_name}_test.pt",
+            f"{self.preferences.data_split_config.store_path}/{self.node_name}_test.pt",
         )
         self.train_loader = torch.utils.data.DataLoader(
             self.train_set,
@@ -159,9 +161,10 @@ class FederatedNode:
         # If we already used this client we need to load the state regarding
         # the private model
         if os.path.exists(f"{self.node_folder_path}privacy_engine.pkl"):
-            logger.info(f"Loading Privacy Engine on node {self.node_name}")
             with open(f"{self.node_folder_path}privacy_engine.pkl", "rb") as file:
                 accountant = dill.load(file)
+                logger.info(f"Node {self.node_name} loaded privacy engine during {self.phase} phase")
+
         return accountant
 
     def compute_performances(
@@ -196,10 +199,10 @@ class FederatedNode:
         phase: Phase,
         # results: dict | None = None,
     ) -> tuple[list[float], list[float], list[float]]:
-        accountant = self.load_accountant()
-        privacy_engine = PrivacyEngine(accountant="rdp")
-        if accountant:
-            privacy_engine.accountant = accountant
+        # accountant = self.load_accountant()
+        # privacy_engine = PrivacyEngine(accountant="rdp")
+        # if accountant:
+        #     privacy_engine.accountant = accountant
 
         model = Utils.get_model(preferences=self.preferences).to(self.device)
         Utils.set_params(model, self.weights)
@@ -214,7 +217,11 @@ class FederatedNode:
         )
         private_model.train()
 
-        local_epochs = self.preferences.server_config.local_training_epochs
+        local_epochs = (
+            self.preferences.server_config.local_training_epochs
+            if phase == Phase.SERVER
+            else self.preferences.p2p_config.local_training_epochs
+        )
 
         private_model.train()
         for _ in range(local_epochs):
@@ -234,9 +241,10 @@ class FederatedNode:
         # details about the private training
         directory_path = Path(self.node_folder_path)
         directory_path.mkdir(parents=True, exist_ok=True)
-
-        with open(f"{self.node_folder_path}/privacy_engine.pkl", "wb") as f:
-            dill.dump(self.privacy_engine.accountant, f)
+        
+        if self.noise_multiplier != 0:
+            with open(f"{self.node_folder_path}privacy_engine.pkl", "wb") as f:
+                dill.dump(self.privacy_engine.accountant, f)
 
         Utils.set_params(model, Utils.get_parameters(private_model))
         gc.collect()
@@ -257,11 +265,16 @@ class FederatedNode:
             if self.preferences.hyperparameters_config.max_grad_norm
             else 100000000
         )
-        if phase == Phase.P2P and self.preferences.p2p_config.differential_privacy:
+        if (
+            phase == Phase.P2P
+            and self.preferences.p2p_config
+            and self.preferences.p2p_config.differential_privacy
+        ):
             epsilon = self.preferences.p2p_config.epsilon
             noise_multiplier = self.preferences.p2p_config.noise_multiplier
         elif (
             phase == Phase.SERVER
+            and self.preferences.server_config
             and self.preferences.server_config.differential_privacy
         ):
             epsilon = self.preferences.server_config.epsilon
@@ -269,7 +282,6 @@ class FederatedNode:
 
         if epsilon:
             logger.info(f"Initializing differential privacy with epsilon {epsilon}")
-
             # (
             #     self.net,
             #     optimizer,
@@ -284,6 +296,7 @@ class FederatedNode:
             #     max_grad_norm=clipping,
             # )
         else:
+            self.noise_multiplier = noise_multiplier
             logger.info(
                 f"Initializing differential privacy with noise {noise_multiplier} and clipping {clipping}"
             )

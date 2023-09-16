@@ -41,7 +41,7 @@
     ],
     "wandb_config": {
         "tags": [
-            "mnist_10_5"
+            "mnist_10_5_non_iid_5"
         ],
         "name": "Baseline",
         "project_name": "Public_Private"

@@ -36,7 +36,7 @@ def start_train(phase, preferences, weights, node_id, node_name, cluster_id):
         node_name=node_name,
         cluster_id=cluster_id,
         preferences=preferences,
-        phase=Phase.SERVER,
+        phase=phase,
         weights=weights,
     )
     weights, metrics, num_examples = node.train_local_model(phase)
@@ -70,8 +70,8 @@ class Orchestrator:
         self.federated_model = None
         self.validation_set = None
         self.pool_size = self.preferences.pool_size
-        self.p2p_phase = True if self.preferences.p2p_config else False
-        self.server_phase = True if self.preferences.server_config else False
+        self.p2p_phase = bool(self.preferences.p2p_config)
+        self.server_phase = bool(self.preferences.server_config)
         self.sampled_nodes = self.preferences.pool_size
         self.local_epochs_server = (
             preferences.server_config.local_training_epochs if self.server_phase else 0
@@ -87,10 +87,12 @@ class Orchestrator:
         self.total_epsilon = 0
         set_start_method("spawn")
         self.p2p_weights = {}
-        self.store_path = f"../data/{self.preferences.dataset}/nodes_data/"
+        self.store_path = f"{self.preferences.data_split_config.store_path}/nodes_data/"
         if os.path.exists(self.store_path):
             shutil.rmtree(self.store_path)
         os.makedirs(self.store_path)
+        self.cluster_nodes = {}
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     def launch_orchestrator(self) -> None:
         self.load_validation_data()
@@ -106,16 +108,13 @@ class Orchestrator:
                 group="Orchestrator", preferences=self.preferences
             )
 
-        print(f"P2P {self.p2p_phase} - Server {self.server_phase}")
         if self.p2p_phase:
+            logger.info("Orchestrating P2P phase")
             # In this case we want to perform a P2P training
             self.orchestrate_nodes(phase=Phase.P2P)
 
-        if os.path.exists(self.store_path):
-            shutil.rmtree(self.store_path)
-        os.makedirs(self.store_path)
-
         if self.server_phase:
+            logger.info("Orchestrating Server phase")
             # In this case we want to perform a server training
             self.orchestrate_nodes(phase=Phase.SERVER)
         logger.debug("Training finished")
@@ -134,9 +133,13 @@ class Orchestrator:
         """
         nodes = []
         for cluster_id in range(self.preferences.data_split_config.num_clusters):
+            if cluster_id not in self.cluster_nodes:
+                self.cluster_nodes[cluster_id] = []
             for node_id in range(self.preferences.data_split_config.num_nodes):
                 node_name = f"cluster_{cluster_id}_node_{node_id}"
-                nodes.append(NodeInfo(node_name, node_id, cluster_id))
+                node = NodeInfo(node_name, node_id, cluster_id)
+                nodes.append(node)
+                self.cluster_nodes[cluster_id].append(node)
             if self.p2p_phase:
                 self.p2p_weights[cluster_id] = Utils.get_parameters(self.model)
 
@@ -148,16 +151,7 @@ class Orchestrator:
         )
         iterations = self.fl_rounds_p2p if phase == Phase.P2P else self.fl_rounds_server
 
-        data_test = torch.load("../data/mnist/federated_data/server_validation_set.pt")
-
-        test_loader = torch.utils.data.DataLoader(
-            data_test,
-            batch_size=128,
-            shuffle=False,
-            num_workers=0,
-        )
         self.model.to("cuda:0")
-        
 
         with multiprocess.Pool(self.pool_size) as pool:
             for iteration in range(iterations):
@@ -172,7 +166,7 @@ class Orchestrator:
                     sampled_nodes = random.sample(nodes_to_select, to_select)
 
                     nodes_to_select = list(set(nodes_to_select) - set(sampled_nodes))
-                    if phase == Phase.P2P and self.p2p_weights:
+                    if phase == Phase.P2P and self.p2p_weights or (phase == Phase.SERVER and iteration == 0 and self.p2p_phase):
                         weights = self.p2p_weights
                     else:
                         weights = Utils.get_parameters(self.model)
@@ -181,10 +175,10 @@ class Orchestrator:
                         pool.apply_async(
                             start_train,
                             (
-                                Phase.SERVER,
+                                phase,
                                 self.preferences,
                                 weights[node.cluster_id]
-                                if phase == Phase.P2P
+                                if phase == Phase.P2P or (phase == Phase.SERVER and iteration == 0 and self.p2p_phase)
                                 else weights,
                                 node.node_id,
                                 node.node_name,
@@ -207,9 +201,11 @@ class Orchestrator:
                         if phase == Phase.P2P:
                             if cluster_id not in all_weights_p2p:
                                 all_weights_p2p[cluster_id] = []
-                            all_weights_p2p[cluster_id].append(copy.deepcopy(
-                                weights,
-                            ))
+                            all_weights_p2p[cluster_id].append(
+                                copy.deepcopy(
+                                    weights,
+                                )
+                            )
                             if cluster_id not in num_examples_list_p2p:
                                 num_examples_list_p2p[cluster_id] = []
                             num_examples_list_p2p[cluster_id].append(num_examples)
@@ -219,7 +215,6 @@ class Orchestrator:
                             metrics_list.append(metrics)
 
                 if phase == Phase.P2P:
-                    print(num_examples_list_p2p[cluster_id])
 
                     for cluster_id in all_weights_p2p:
                         aggregated_weights = Utils.aggregate_weights(
@@ -259,41 +254,92 @@ class Orchestrator:
 
                 logger.debug("Computed the average")
                 if phase == Phase.SERVER:
-                    self.evaluate(iteration=iteration)
+                    (
+                        loss,
+                        accuracy,
+                        fscore,
+                        precision,
+                        recall,
+                        test_accuracy_per_class,
+                    ) = Learning.evaluate_model(
+                        model=self.model,
+                        test_loader=self.validation_set,
+                        device=self.device,
+                    )
+                    metrics = {
+                        "test loss": loss,
+                        "test accuracy": accuracy,
+                        "test fscore": fscore,
+                        "test precision": precision,
+                        "test recall": recall,
+                        "test_accuracy_per_class": test_accuracy_per_class,
+                        "FL_round": iteration + self.fl_rounds_p2p,
+                        "FL Round Server": iteration,
+                    }
+                    self.log_metrics(
+                        metrics,
+                    )
+                else:
+                    pass
+                    # self.evaluate_p2p(iteration=iteration)
 
-    def evaluate(self, iteration: int) -> None:
-        logger.debug("Computing metrics...")
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.model.to(self.device)
-        (
-            loss,
-            accuracy,
-            fscore,
-            precision,
-            recall,
-            test_accuracy_per_class,
-        ) = Learning.evaluate_model(
-            model=self.model,
-            test_loader=self.validation_set,
-            device=self.device,
-        )
+    # def evaluate_p2p(self, iteration: int):
+    #     for cluster_id, weights in self.p2p_weights.items():
+    #         losses = []
+    #         accuracies = []
+    #         fscores = []
+    #         precisions = []
+    #         recalls = []
+    #         cluster_model = copy.deepcopy(self.model)
+    #         Utils.set_params(cluster_model, self.p2p_weights[cluster_id])
+    #         for node in self.cluster_nodes[cluster_id]:
+    #             data_test_node = torch.load(
+    #                 torch.load(
+    #                     f"../data/{self.preferences.dataset}/federated_data/{node.node_name}_test.pt"
+    #                 )
+    #             )
+    #             test_node = torch.utils.data.DataLoader(
+    #                 data_test_node,
+    #                 batch_size=128,
+    #                 shuffle=False,
+    #                 num_workers=0,
+    #             )
+    #             (
+    #                 loss,
+    #                 accuracy,
+    #                 fscore,
+    #                 precision,
+    #                 recall,
+    #                 _,
+    #             ) = Learning.evaluate_model(
+    #                 model=cluster_model,
+    #                 test_loader=test_node,
+    #                 device=self.device,
+    #             )
+    #             losses.append(loss)
+    #             accuracies.append(accuracy)
+    #             fscores.append(fscore)
+    #             precisions.append(precision)
+    #             recalls.append(recall)
 
-        metrics = {
-            "test loss": loss,
-            "test accuracy": accuracy,
-            "test fscore": fscore,
-            "test precision": precision,
-            "test recall": recall,
-            "test_accuracy_per_class": test_accuracy_per_class,
-            "FL_round": iteration + self.fl_rounds_p2p,
-            "FL Round Server": iteration,
-        }
-        logger.debug(metrics)
-        logger.debug("Metrics computed")
-        logger.debug("Logging the metrics on wandb")
-        if self.preferences.wandb:
-            Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
-        logger.debug("Metrics logged")
+    #             metrics = {
+    #                 f"test loss {node.node_name}": loss,
+    #                 f"test accuracy {node.node_name}": accuracy,
+    #                 f"test fscore {node.node_name}": fscore,
+    #                 f"test precision {node.node_name}": precision,
+    #                 f"test recall {node.node_name}": recall,
+    #                 f"FL Round P2P {node.node_name}": iteration,
+    #             }
+    #             self.log_metrics(metrics)
+    #         metrics = {
+    #             f"test loss {cluster_id}": np.mean(losses),
+    #             f"test accuracy {cluster_id}": np.mean(accuracies),
+    #             f"test fscore {cluster_id}": np.mean(fscores),
+    #             f"test precision {cluster_id}": np.mean(precisions),
+    #             f"test recall {cluster_id}": np.mean(recalls),
+    #             f"FL Round P2P {cluster_id}": iteration,
+    #         }
+    #         self.log_metrics(metrics)
 
     def load_validation_data(self) -> None:
         """This function loads the validation data from disk."""
@@ -319,3 +365,11 @@ class Orchestrator:
                 targets.append(data[-1])
             targets = [item.item() for sublist in targets for item in sublist]
             logger.info(f"Validation set: {Counter(targets)}")
+
+    def log_metrics(self, metrics: dict):
+        logger.debug(metrics)
+        logger.debug("Metrics computed")
+        logger.debug("Logging the metrics on wandb")
+        if self.preferences.wandb:
+            Utils.log_metrics_to_wandb(wandb_run=self.wandb, metrics=metrics)
+        logger.debug("Metrics logged")
