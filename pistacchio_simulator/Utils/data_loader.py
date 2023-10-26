@@ -21,5 +21,6 @@ class DataLoader:
             _type_: _description_
         """
 
+        print(f"LOADING {path_train}")
         data = torch.load(path_train)
         return data

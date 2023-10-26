@@ -1,0 +1,43 @@
+program: run_test.py
+method: bayes
+metric:
+  name: Loss_validation
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+parameters:
+  optimizer:
+    values: ["adam", "sgd"]
+  lr_p2p:
+    min: 0.001
+    max: 0.1
+  lr_server:
+    min: 0.0001
+    max: 0.1
+  batch_size:
+    distribution: q_log_uniform_values
+    q: 8
+    min: 100
+    max: 256
+  batch_size_p2p:
+    distribution: q_log_uniform_values
+    q: 8
+    min: 100
+    max: 256
+  local_training_epochs_server:
+    min: 1
+    max: 2
+  fl_rounds_server:
+    min: 5
+    max: 20
+
+command:  
+  - ${env}
+  - poetry 
+  - run 
+  - python
+  - ${program}
+  - --config 
+  - p2p+server.json
+  - ${args}

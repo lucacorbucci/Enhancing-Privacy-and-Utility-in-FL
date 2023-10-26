@@ -1,17 +1,15 @@
-cd ./10_5_non_iid_1
-sh run_experiment.sh
-cd ../
-cd ./10_5_non_iid_5
-sh run_experiment.sh
-cd ../
-cd ./10_5_unbalanced
-sh run_experiment.sh
+# cd ./3_8
+# sh run_sweep.sh
+# cd ../
 
-cd ./20_5_non_iid_1
-sh run_experiment.sh
+cd ./5_4
+sh run_sweep.sh
 cd ../
-cd ./20_5_non_iid_5
-sh run_experiment.sh
+
+# cd ./8_3
+# sh run_sweep.sh
+# cd ../
+
+cd ./10_4
+sh run_sweep.sh
 cd ../
-cd ./20_5_unbalanced
-sh run_experiment.sh

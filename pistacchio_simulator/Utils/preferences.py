@@ -13,7 +13,9 @@ class PartitionConfig(BaseModel):
     alpha: Optional[int] = None
     percentage_configuration: Optional[dict] = None
     store_path: str = Field(...)
-    server_validation_set: str = Field(...)
+    server_test_set: str = Field(...)
+    max_size: Optional[float] = None
+    validation_size: Optional[float] = 0
 
 
 class P2PConfig(BaseModel):
@@ -25,6 +27,8 @@ class P2PConfig(BaseModel):
     epsilon: Optional[float] = None
     noise_multiplier: Optional[float] = None
     epsilon_mixed: Optional[float] = None
+    lr: float = None
+    batch_size: int = None
 
 
 class ServerConfig(BaseModel):
@@ -35,20 +39,22 @@ class ServerConfig(BaseModel):
     total_mixed_rounds: Optional[int] = 0
     epsilon: Optional[float] = None
     noise_multiplier: Optional[float] = None
+    lr: float = None
+    batch_size: int = None
 
 
 class HyperparametersConfig(BaseModel):
-    batch_size: int
-    lr: float
     max_phisical_batch_size: int
     delta: Optional[float] = None
     max_grad_norm: float = Field(...)
+    optimizer: str = Field(...)
 
 
 class WandbConfig(BaseModel):
     tags: list[str]
     name: str
     project_name: str
+    sweep: bool
 
 
 @dataclass
@@ -65,3 +71,5 @@ class Preferences:
     hyperparameters_config: Optional[HyperparametersConfig] = Field(...)
     gpu_config: list[str] = Field(...)
     wandb_config: Optional[WandbConfig] = None
+    dataset_p2p: Optional[str] = None
+    dataset_server: Optional[str] = None

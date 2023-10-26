@@ -225,7 +225,7 @@ This is the easiest way to generate a percentage split. In the configuration fil
         "num_nodes": 3,
         "num_clusters": 3,
         "noniid_nodes_distribution": false,
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
         "percentage_configuration": {
             "cluster_0": {
                 "0": 80,

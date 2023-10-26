@@ -21,7 +21,7 @@ preferences = Preferences(
         "num_nodes": 5,
         "num_clusters": 1,
         "split_type": "percentage",
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
     },
     p2p_config={
         "local_training_epochs": 1,

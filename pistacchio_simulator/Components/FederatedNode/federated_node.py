@@ -9,16 +9,14 @@ import numpy as np
 import torch
 from loguru import logger
 from opacus import PrivacyEngine
-from torch import Tensor, nn
-
+from opacus.utils.batch_memory_manager import BatchMemoryManager
 from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.performances import Performances
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-from pistacchio_simulator.Utils.weights import Weights
-
+from torch import Tensor, nn
 
 logger.remove()
 logger.add(
@@ -35,33 +33,46 @@ def accuracy(preds, labels):
     return (preds == labels).mean()
 
 
-def train(model, device, train_loader, optimizer, privacy_engine, epoch):
+def train(model, train_loader, optimizer, epoch, device, privacy_engine):
     model.train()
+
     criterion = nn.CrossEntropyLoss()
+
+    DELTA = 1e-5
     losses = []
     top1_acc = []
-    for _batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = criterion(output, target)
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        preds = np.argmax(output.detach().cpu().numpy(), axis=1)
-        labels = target.detach().cpu().numpy()
-        acc = accuracy(preds, labels)
-        losses.append(loss.item())
-        top1_acc.append(acc)
 
-        epsilon = privacy_engine.accountant.get_epsilon(delta=1e-5)
-        if (_batch_idx + 1) % 20 == 0:
-            print(
-                f"Train Epoch: {epoch} \t"
-                f"Loss: {np.mean(losses):.6f} "
-                f"(ε = {epsilon:.2f}, δ = {1e-5})"
-                f"Acc@1: {np.mean(top1_acc) * 100:.6f} "
-            )
+    with BatchMemoryManager(
+        data_loader=train_loader,
+        max_physical_batch_size=128,
+        optimizer=optimizer,
+    ) as memory_safe_data_loader:
+        for i, (images, target) in enumerate(memory_safe_data_loader):
+            optimizer.zero_grad()
+            model.to(device)
+
+            images = images.to(device)
+            target = target.to(device)
+
+            # compute output
+            output = model(images)
+            loss = criterion(output, target)
+
+            loss.backward()
+
+            optimizer.step()
+
+            preds = np.argmax(output.detach().cpu().numpy(), axis=1)
+            labels = target.detach().cpu().numpy()
+
+            # measure accuracy and record loss
+            acc = accuracy(preds, labels)
+
+            losses.append(loss.item())
+            top1_acc.append(acc)
+
+        epsilon = privacy_engine.get_epsilon(DELTA)
+        return np.mean(losses), np.mean(top1_acc), epsilon
 
 
 class FederatedNode:
@@ -97,9 +108,7 @@ class FederatedNode:
         self.mixed = False
         self.message_counter = 0
         self.node_name = node_name
-        self.node_folder_path = (
-            f"{self.preferences.data_split_config.store_path}/nodes_data/{self.node_name}/"
-        )
+        self.node_folder_path = f"{self.preferences.data_split_config.store_path}/nodes_data/{self.node_name}/"
         self.load_data()
         gpus = preferences.gpu_config
         if gpus:
@@ -120,38 +129,70 @@ class FederatedNode:
         logger.info(f"Node {self.node_name} is using device {self.device}")
 
     def load_data(self):
+        self.validation_set = None
+        self.validation_loader = None
         if self.preferences.public_private_experiment and self.phase == Phase.P2P:
-            # When I have the P2P phase and during that phase I don't use differential privacy
-            # then I have to use the public dataset. Instead, when I use DP, I'll use the
-            # private training dataset even during the P2P phase
-            if not self.preferences.p2p_config.differential_privacy:
+            if self.preferences.dataset_p2p:
+                # When I have the P2P phase and during that phase I don't use differential privacy
+                # then I have to use the public dataset. Instead, when I use DP, I'll use the
+                # private training dataset even during the P2P phase
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_train.pt",
+                )
+            else:
                 self.train_set = DataLoader().load_splitted_dataset(
                     f"{self.preferences.data_split_config.store_path}/{self.node_name}_public_train.pt",
+                )
+        elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
+            if self.preferences.dataset_server:
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_train.pt",
                 )
             else:
                 self.train_set = DataLoader().load_splitted_dataset(
                     f"{self.preferences.data_split_config.store_path}/{self.node_name}_private_train.pt",
                 )
-        elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
-            self.train_set = DataLoader().load_splitted_dataset(
-                f"{self.preferences.data_split_config.store_path}/{self.node_name}_private_train.pt",
-            )
         else:
             self.train_set = DataLoader().load_splitted_dataset(
                 f"{self.preferences.data_split_config.store_path}/{self.node_name}_train.pt",
             )
+        from collections import Counter
+
+        print(
+            f"NODE NAME {self.node_name} has {Counter([target.item() for target in self.train_set.targets])}"
+        )
         self.test_set = DataLoader().load_splitted_dataset(
             f"{self.preferences.data_split_config.store_path}/{self.node_name}_test.pt",
         )
+
+        if self.phase == Phase.P2P:
+            batch_size = self.preferences.p2p_config.batch_size
+        else:
+            batch_size = self.preferences.server_config.batch_size
+
+        if self.preferences.data_split_config.validation_size > 0:
+            self.validation_set = DataLoader().load_splitted_dataset(
+                f"{self.preferences.data_split_config.store_path}/{self.node_name}_validation.pt",
+            )
+            self.validation_loader = torch.utils.data.DataLoader(
+                self.validation_set,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=0,
+            )
+
         self.train_loader = torch.utils.data.DataLoader(
             self.train_set,
-            batch_size=self.preferences.hyperparameters_config.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=0,
         )
+
+        print(self.train_loader.dataset.targets)
+
         self.test_loader = torch.utils.data.DataLoader(
             self.test_set,
-            batch_size=self.preferences.hyperparameters_config.batch_size,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=0,
         )
@@ -163,7 +204,9 @@ class FederatedNode:
         if os.path.exists(f"{self.node_folder_path}privacy_engine.pkl"):
             with open(f"{self.node_folder_path}privacy_engine.pkl", "rb") as file:
                 accountant = dill.load(file)
-                logger.info(f"Node {self.node_name} loaded privacy engine during {self.phase} phase")
+                logger.info(
+                    f"Node {self.node_name} loaded privacy engine during {self.phase} phase"
+                )
 
         return accountant
 
@@ -207,15 +250,21 @@ class FederatedNode:
         model = Utils.get_model(preferences=self.preferences).to(self.device)
         Utils.set_params(model, self.weights)
 
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0)
+        optimizer = Utils.get_optimizer(
+            preferences=self.preferences, model=model, phase=phase
+        )
+
+        model = model.to(self.device)
+
         (
             private_model,
             private_optimizer,
             train_loader,
         ) = self.init_differential_privacy(
-            phase=phase, optimizer=optimizer, model=model
+            phase=phase,
+            optimizer=optimizer,
+            model=model,
         )
-        private_model.train()
 
         local_epochs = (
             self.preferences.server_config.local_training_epochs
@@ -223,25 +272,60 @@ class FederatedNode:
             else self.preferences.p2p_config.local_training_epochs
         )
 
-        private_model.train()
-        for _ in range(local_epochs):
-            train_loss, accuracy, epsilon, noise_multiplier = Learning.train(
+        for local_epoch in range(local_epochs):
+            train_loss, accuracy, epsilon = train(
                 model=private_model,
-                preferences=self.preferences,
-                phase=phase,
-                node_name=self.node_name,
+                train_loader=train_loader,
                 optimizer=private_optimizer,
+                epoch=local_epoch,
                 device=self.device,
                 privacy_engine=self.privacy_engine,
-                train_loader=train_loader,
             )
             metrics = {"loss": train_loss, "accuracy": accuracy, "epsilon": epsilon}
+
+        # Evaluate the model on validation set
+        if self.validation_loader is not None:
+            print("LEN: ", len(self.validation_loader.dataset))
+            (
+                validation_loss,
+                validation_accuracy,
+                _,
+                _,
+                _,
+                _,
+            ) = Learning.evaluate_model(
+                model=private_model,
+                test_loader=self.validation_loader,
+                device=self.device,
+            )
+        else:
+            print("NON HO IL VALIDATION SET")
+
+        # Evaluate the model on test set
+        if self.test_set:
+            (
+                test_loss,
+                test_accuracy,
+                _,
+                _,
+                _,
+                _,
+            ) = Learning.evaluate_model(
+                model=private_model,
+                test_loader=self.test_loader,
+                device=self.device,
+            )
+
+        metrics["validation_loss"] = torch.tensor(validation_loss)
+        metrics["test_loss"] = torch.tensor(test_loss)
+        metrics["validation_accuracy"] = torch.tensor(validation_accuracy)
+        metrics["test_accuracy"] = torch.tensor(test_accuracy)
 
         # We need to store the state of the privacy engine and all the
         # details about the private training
         directory_path = Path(self.node_folder_path)
         directory_path.mkdir(parents=True, exist_ok=True)
-        
+
         if self.noise_multiplier != 0:
             with open(f"{self.node_folder_path}privacy_engine.pkl", "wb") as f:
                 dill.dump(self.privacy_engine.accountant, f)
@@ -297,6 +381,8 @@ class FederatedNode:
             # )
         else:
             self.noise_multiplier = noise_multiplier
+            if self.noise_multiplier == 0:
+                clipping = 100000000
             logger.info(
                 f"Initializing differential privacy with noise {noise_multiplier} and clipping {clipping}"
             )

@@ -61,7 +61,6 @@ class Learning:
                     optimizer.step()
                     optimizer.zero_grad()
                     _, predicted = torch.max(outputs.data, 1)
-
                     total_correct += (predicted == target).float().sum()
                     total += target.size(0)
                     losses.append(loss.item())
@@ -72,7 +71,7 @@ class Learning:
             train_loss = np.mean(losses)
             accuracy = total_correct / total
             logger.info(
-                f"Training loss: {train_loss}, accuracy: {accuracy} - total_correct = {total_correct}, total = {total}"
+                f"----> Training loss: {train_loss}, accuracy: {accuracy} - total_correct = {total_correct}, total = {total}"
             )
 
             if node_name != "server":

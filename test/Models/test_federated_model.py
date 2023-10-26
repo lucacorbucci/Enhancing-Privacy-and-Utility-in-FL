@@ -8,7 +8,6 @@ import torch
 from opacus.grad_sample.grad_sample_module import GradSampleModule
 from torch import Tensor, nn, optim
 
-
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
@@ -23,7 +22,6 @@ from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task
 
-
 preferences_mnist = Preferences(
     dataset_name="mnist",
     mode="classic",
@@ -35,7 +33,7 @@ preferences_mnist = Preferences(
         "split_type": "stratified",
         "num_nodes": 8,
         "num_clusters": 8,
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
     },
     p2p_config={
         "local_training_epochs": 1,
@@ -72,7 +70,7 @@ preferences_cifar = Preferences(
         "split_type": "stratified",
         "num_nodes": 8,
         "num_clusters": 8,
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
     },
     p2p_config={
         "local_training_epochs": 1,
@@ -109,7 +107,7 @@ preferences_cifar_epsilon = Preferences(
         "split_type": "stratified",
         "num_nodes": 8,
         "num_clusters": 8,
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
     },
     p2p_config={
         "local_training_epochs": 1,

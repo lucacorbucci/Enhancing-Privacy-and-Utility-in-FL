@@ -19,7 +19,7 @@ preferences_mnist = {
         "num_nodes": 1,
         "num_clusters": 2,
         "num_classes_per_cluster": 2,
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
         "percentage_configuration": {
             "cluster_1": {"1": 70, "2": 40, "3": 20, "4": 20},
             "cluster_0": {"0": 60, "1": 30, "2": 20, "3": 20},
@@ -135,7 +135,7 @@ class TestPreferences:
             "num_nodes": 1,
             "num_clusters": 2,
             "num_classes_per_cluster": 2,
-            "server_validation_set": "server_validation_split",
+            "server_test_set": "server_validation_split",
             "percentage_configuration": {
                 "cluster_1": {"1": 70, "2": 40, "3": 20, "4": 20},
                 "cluster_0": {"0": 60, "1": 30, "2": 20, "3": 20},

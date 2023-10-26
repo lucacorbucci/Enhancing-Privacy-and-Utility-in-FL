@@ -194,9 +194,7 @@ if __name__ == "__main__":
         gc.collect()
         return True, get_parameters(model)
 
-    data_test = torch.load(
-        "../examples/data/mnist/federated_data/server_validation_set.pt"
-    )
+    data_test = torch.load("../examples/data/mnist/federated_data/server_test_set.pt")
 
     test_loader = torch.utils.data.DataLoader(
         data_test,
