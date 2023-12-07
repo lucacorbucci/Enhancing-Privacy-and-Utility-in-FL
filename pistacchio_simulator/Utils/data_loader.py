@@ -2,6 +2,7 @@ from typing import Any
 
 import dill
 import torch
+from torch.utils.data import Dataset
 
 
 class DataLoader:

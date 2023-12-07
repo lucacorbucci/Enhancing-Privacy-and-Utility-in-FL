@@ -13,13 +13,14 @@ import torch
 from loguru import logger
 from multiprocess import set_start_method
 from opacus import PrivacyEngine
+from torch import nn
+
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-from torch import nn
 
 logger.remove()
 logger.add(
@@ -87,16 +88,17 @@ class Orchestrator:
 
     def launch_orchestrator(self) -> None:
         if self.p2p_phase:
-            noise = self.get_current_noise(self.preferences.p2p_config, phase=Phase.P2P)
+            noise = 0 #self.get_current_noise(self.preferences.p2p_config, phase=Phase.P2P)
             self.preferences.p2p_config.noise_multiplier = noise
             self.preferences.p2p_config.epsilon = None
 
         if self.server_phase:
-            noise = self.get_current_noise(
-                self.preferences.server_config, phase=Phase.SERVER
-            )
-            self.preferences.server_config.noise_multiplier = noise
-            self.preferences.server_config.epsilon = None
+            if self.preferences.server_config.epsilon:
+                noise = self.get_current_noise(
+                    self.preferences.server_config, phase=Phase.SERVER
+                )
+                self.preferences.server_config.noise_multiplier = noise
+                self.preferences.server_config.epsilon = None
 
         self.load_test_data()
 
@@ -112,18 +114,17 @@ class Orchestrator:
             )
 
         self.model.to(self.device)
-        (
-            loss,
-            accuracy,
-            fscore,
-            precision,
-            recall,
-            test_accuracy_per_class,
-        ) = Learning.evaluate_model(
-            model=self.model,
-            test_loader=self.test_set,
-            device=self.device,
-        )
+        # (
+        #     loss,
+        #     accuracy,
+        #     fscore,
+        #     precision,
+        #     recall,
+        # ) = Learning.evaluate_model(
+        #     model=self.model,
+        #     test_loader=self.test_set,
+        #     device=self.device,
+        # )
 
         # This is the case in which we perform a training that involves
         # both the P2P and the Server phase
@@ -378,7 +379,7 @@ class Orchestrator:
 
                 if phase == Phase.P2P:
                     validation_accuracy_clusters = []
-                    test_accuracy_clusters = []
+                    # test_accuracy_clusters = []
                     for cluster_id in all_weights_p2p:
                         aggregated_weights = Utils.aggregate_weights(
                             all_weights_p2p[cluster_id],
@@ -396,20 +397,20 @@ class Orchestrator:
                                 for metric in metrics_list
                             ],
                         )
-                        aggregated_test_accuracy_cluster = np.mean(
-                            [metric["test_accuracy"].item() for metric in metrics_list],
-                        )
+                        # aggregated_test_accuracy_cluster = np.mean(
+                        #     [metric["test_accuracy"].item() for metric in metrics_list],
+                        # )
                         validation_accuracy_clusters.append(
                             aggregated_validation_accuracy_cluster
                         )
-                        test_accuracy_clusters.append(aggregated_test_accuracy_cluster)
+                        # test_accuracy_clusters.append(aggregated_test_accuracy_cluster)
                         if self.preferences.wandb:
                             Utils.log_metrics_to_wandb(
                                 wandb_run=self.wandb,
                                 metrics={
                                     "FL Round P2P": iteration,
-                                    "FL Round": iteration,
-                                    f"Aggregated Test Accuracy cluster {cluster_id}": aggregated_test_accuracy_cluster,
+                                    "FL Round": iteration + self.fl_rounds_server,
+                                    # f"Aggregated Test Accuracy cluster {cluster_id}": aggregated_test_accuracy_cluster,
                                     f"Aggregated Validation Accuracy {cluster_id}": aggregated_validation_accuracy_cluster,
                                 },
                             )
@@ -426,19 +427,22 @@ class Orchestrator:
                     aggregated_validation_loss = np.mean(
                         [metric["validation_loss"].item() for metric in metrics_list]
                     )
-                    aggregated_test_loss = np.mean(
-                        [metric["test_loss"].item() for metric in metrics_list]
-                    )
+                    # aggregated_test_loss = np.mean(
+                    #     [metric["test_loss"].item() for metric in metrics_list]
+                    # )
                     aggregated_validation_accuracy = np.mean(
                         [
                             metric["validation_accuracy"].item()
+                            if isinstance(metric["validation_accuracy"], torch.Tensor)
+                            else metric["validation_accuracy"]
                             for metric in metrics_list
                         ]
                     )
-                    aggregated_test_accuracy = np.mean(
-                        [metric["test_accuracy"].item() for metric in metrics_list]
-                    )
+                    # aggregated_test_accuracy = np.mean(
+                    # [metric["test_accuracy"].item() for metric in metrics_list]
+                    # )
 
+                    # P2P
                     if self.preferences.wandb:
                         Utils.log_metrics_to_wandb(
                             wandb_run=self.wandb,
@@ -448,21 +452,44 @@ class Orchestrator:
                                 "EPSILON": aggregated_epsilon,
                                 "FL Round P2P": iteration,
                                 "FL Round": iteration,
-                                "Average Nodes Test Loss": aggregated_test_loss,
-                                "Average Nodes Test Accuracy": aggregated_test_accuracy,
-                                "Average Nodes Validation Loss": aggregated_validation_loss,
-                                "Average Nodes Validation Accuracy": aggregated_validation_accuracy,
-                                "Average Cluster Test Accuracy": np.mean(
-                                    test_accuracy_clusters
-                                ),
+                                # "Aggregated Test Loss": aggregated_test_loss,
+                                # "Aggregated Test Accuracy": aggregated_test_accuracy,
+                                "Aggregated Validation Loss": aggregated_validation_loss,
+                                "Aggregated Validation Accuracy": aggregated_validation_accuracy,
+                                "Custom_Metric": aggregated_validation_accuracy,
+                                # "Average Cluster Test Accuracy": np.mean(
+                                #     test_accuracy_clusters
+                                # ),
                                 "Average Cluster Validation Accuracy": np.mean(
                                     validation_accuracy_clusters
                                 ),
-                                "Custom Metric": np.mean(
-                                    aggregated_validation_accuracy
-                                ),
                             },
                         )
+
+                    for cluster_name, cluster_test in self.test_loaders.items():
+                        cluster_model = copy.deepcopy(self.model)
+                        Utils.set_params(cluster_model, self.p2p_weights[cluster_name])
+                        (
+                            _,
+                            accuracy,
+                            _,
+                            _,
+                            _,
+                        ) = Learning.evaluate_model(
+                            model=cluster_model,
+                            test_loader=cluster_test,
+                            device=self.device,
+                        )
+                        if self.preferences.wandb:
+                            Utils.log_metrics_to_wandb(
+                                wandb_run=self.wandb,
+                                metrics={
+                                    "FL Round P2P": iteration,
+                                    "FL Round": iteration + self.fl_rounds_server,
+                                    # f"Aggregated Test Accuracy cluster {cluster_id}": aggregated_test_accuracy_cluster,
+                                    f"Test Accuracy {cluster_name}": accuracy,
+                                },
+                            )
                 else:
                     aggregated_weights = Utils.aggregate_weights(
                         all_weights,
@@ -484,9 +511,11 @@ class Orchestrator:
                     aggregated_validation_loss = np.mean(
                         [metric["validation_loss"].item() for metric in metrics_list]
                     )
-                    aggregated_test_loss = np.mean(
-                        [metric["test_loss"].item() for metric in metrics_list]
-                    )
+                    # aggregated_test_loss = np.mean(
+                    #     [metric["test_loss"].item() for metric in metrics_list]
+                    # )
+                    # We compute the mean of the validation accuracy of the different
+                    # nodes involved in the training
                     aggregated_validation_accuracy = np.mean(
                         [
                             metric["validation_accuracy"].item()
@@ -495,9 +524,9 @@ class Orchestrator:
                             for metric in metrics_list
                         ]
                     )
-                    aggregated_test_accuracy = np.mean(
-                        [metric["test_accuracy"].item() for metric in metrics_list]
-                    )
+                    # aggregated_test_accuracy = np.mean(
+                    #     [metric["test_accuracy"].item() for metric in metrics_list]
+                    # )
 
                     if self.preferences.wandb:
                         Utils.log_metrics_to_wandb(
@@ -505,17 +534,35 @@ class Orchestrator:
                             metrics={
                                 "Train loss": aggregated_training_loss,
                                 "Train accuracy": aggregated_training_accuracy,
-                                "FL_round": iteration + self.fl_rounds_p2p,
                                 "EPSILON": aggregated_epsilon,
                                 "FL Round Server": iteration,
-                                "FL Round": iteration + self.fl_rounds_p2p,
-                                "Aggregated Test Loss": aggregated_test_loss,
-                                "Aggregated Test Accuracy": aggregated_test_accuracy,
+                                "FL Round": iteration,
+                                # "Aggregated Test Loss": aggregated_test_loss,
+                                # "Aggregated Test Accuracy": aggregated_test_accuracy,
                                 "Aggregated Validation Loss": aggregated_validation_loss,
                                 "Aggregated Validation Accuracy": aggregated_validation_accuracy,
-                                "Custom Metric": np.mean(
-                                    aggregated_validation_accuracy,
-                                ),
+                                "Custom_Metric": aggregated_validation_accuracy,
+                            },
+                        )
+                    (
+                        _,
+                        accuracy,
+                        _,
+                        _,
+                        _,
+                    ) = Learning.evaluate_model(
+                        model=self.model,
+                        test_loader=self.test_set,
+                        device=self.device,
+                    )
+                    if self.preferences.wandb:
+                        Utils.log_metrics_to_wandb(
+                            wandb_run=self.wandb,
+                            metrics={
+                                "FL Round P2P": iteration,
+                                "FL Round": iteration + self.fl_rounds_server,
+                                # f"Aggregated Test Accuracy cluster {cluster_id}": aggregated_test_accuracy_cluster,
+                                f"Test Accuracy on the server": accuracy,
                             },
                         )
 
@@ -735,10 +782,6 @@ class Orchestrator:
         test_data = torch.load(
             f"{self.preferences.data_split_config.store_path}/{self.preferences.data_split_config.server_test_set}"
         )
-        validation_data = torch.load(
-            f"{self.preferences.data_split_config.store_path}/server_validation_set.pt"
-        )
-
         self.test_set = torch.utils.data.DataLoader(
             test_data,
             batch_size=128,
@@ -746,12 +789,33 @@ class Orchestrator:
             num_workers=0,
         )
 
-        self.validation_set = torch.utils.data.DataLoader(
-            validation_data,
-            batch_size=128,
-            shuffle=False,
-            num_workers=0,
-        )
+        self.test_loaders = {}
+
+        for cluster_name in range(self.preferences.data_split_config.num_clusters):
+            test_cluster = torch.load(
+                f"{self.preferences.data_split_config.store_path}/test_cluster_{cluster_name}.pt"
+            )
+            loaded = torch.utils.data.DataLoader(
+                test_cluster,
+                batch_size=128,
+                shuffle=False,
+                num_workers=0,
+            )
+            self.test_loaders[cluster_name] = loaded
+
+            print(loaded.dataset.targets)
+            print(len(loaded.dataset))
+
+
+
+            
+
+        # self.validation_set = torch.utils.data.DataLoader(
+        #     validation_data,
+        #     batch_size=128,
+        #     shuffle=False,
+        #     num_workers=0,
+        # )
 
         if self.preferences.debug:
             targets = []

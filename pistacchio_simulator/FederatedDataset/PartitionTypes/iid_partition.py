@@ -2,6 +2,7 @@ from collections import Counter
 
 import numpy as np
 import torch
+
 from pistacchio_simulator.FederatedDataset.Utils.lda import create_lda_partitions
 
 
@@ -24,10 +25,10 @@ class IIDPartition:
         ]
 
         splitted_indexes_dict = {
-            f"cluster_{index}": item for index, item in enumerate(splitted_indexes)
+            f"node_{index}": item for index, item in enumerate(splitted_indexes)
         }
         splitted_labels_dict = {
-            f"cluster_{index}": item for index, item in enumerate(splitted_labels)
+            f"node_{index}": item for index, item in enumerate(splitted_labels)
         }
 
         data = dataset.data if hasattr(dataset, "data") else dataset.samples

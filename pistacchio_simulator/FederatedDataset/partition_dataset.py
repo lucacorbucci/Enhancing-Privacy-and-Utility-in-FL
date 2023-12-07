@@ -1,9 +1,11 @@
 import os
+import random
 import shutil
 from collections import Counter
 
 import numpy as np
 import torch
+from torchvision import transforms
 
 from pistacchio_simulator.FederatedDataset.PartitionTypes.iid_partition import (
     IIDPartition,
@@ -52,7 +54,16 @@ class FederatedDataset:
         test_ds: torch.utils.data.Dataset = None,
         max_size: float = None,
         validation_size: float = None,
+        seed: int = 0,
     ) -> None:
+        seed = config.data_split_config.seed if config else seed
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.deterministic = True
+
         dataset_with_csv = False
         if hasattr(train_ds, "image_path"):
             dataset_with_csv = True
@@ -97,11 +108,14 @@ class FederatedDataset:
         # The other case is the one in which we only split the dataset among
         # the nodes. This is a classic Federated learning scenario.
         if num_nodes and num_clusters:
+            # _________________________________________________________________
             # First we split the data among the clusters
+            # _________________________________________________________________
             (
                 splitted_indexes_train,
                 labels_per_cluster_train,
                 samples_per_cluster_train,
+                distribution_per_labels,
             ) = FederatedDataset.partition_data(
                 data=train_ds,
                 split_type=split_type_clusters,
@@ -111,10 +125,12 @@ class FederatedDataset:
                 phase="cluster",
                 max_size=max_size,
             )
+
             (
                 splitted_indexes_test,
                 labels_per_cluster_test,
                 samples_per_cluster_test,
+                _,
             ) = FederatedDataset.partition_data(
                 data=test_ds,
                 split_type=split_type_clusters,
@@ -123,46 +139,24 @@ class FederatedDataset:
                 num_classes=num_classes,
                 phase="cluster",
                 max_size=max_size,
+                previous_distribution_per_labels=distribution_per_labels,
             )
 
             for cluster_name, indexes in splitted_indexes_test.items():
-                validation_test = IIDPartition.do_iid_partitioning_with_indexes(
-                    indexes=np.array(test_ds.targets)[indexes], num_partitions=2
-                )
-                validation_indexes = validation_test[0]
-                test_indexes = validation_test[1]
                 if dataset_with_csv:
-                    test_partition_cluster_validation = MyDatasetWithCSV(
-                        targets=np.array(test_ds.targets)[validation_indexes],
-                        image_path=test_ds.image_path,
-                        image_ids=np.array(test_ds.samples)[validation_indexes],
-                        transform=test_ds.transform,
-                        sensitive_features=np.array(test_ds.sensitive_features)[
-                            validation_indexes
-                        ]
-                        if hasattr(test_ds, "sensitive_features")
-                        else None,
-                    )
                     test_partition_cluster_test = MyDatasetWithCSV(
-                        targets=np.array(test_ds.targets)[test_indexes],
+                        targets=np.array(test_ds.targets)[indexes],
                         image_path=test_ds.image_path,
-                        image_ids=np.array(test_ds.samples)[test_indexes],
+                        image_ids=np.array(test_ds.samples)[indexes],
                         transform=test_ds.transform,
-                        sensitive_features=np.array(test_ds.sensitive_features)[
-                            test_indexes
-                        ]
+                        sensitive_features=np.array(test_ds.sensitive_features)[indexes]
                         if hasattr(test_ds, "sensitive_features")
                         else None,
                     )
                 else:
-                    test_partition_cluster_validation = MyDataset(
-                        targets=test_ds.targets[validation_indexes],
-                        samples=np.array(test_ds.data)[validation_indexes],
-                        transform=test_ds.transform,
-                    )
                     test_partition_cluster_test = MyDataset(
-                        targets=test_ds.targets[test_indexes],
-                        samples=np.array(test_ds.data)[test_indexes],
+                        targets=np.array(test_ds.targets)[indexes],
+                        samples=np.array(test_ds.data)[indexes],
                         transform=test_ds.transform,
                     )
 
@@ -170,23 +164,22 @@ class FederatedDataset:
                     test_partition_cluster_test,
                     f"{store_path}/test_{cluster_name}.pt",
                 )
-                torch.save(
-                    test_partition_cluster_validation,
-                    f"{store_path}/validation_{cluster_name}.pt",
-                )
 
+            # _________________________________________________________________
             # And then we split the data among the nodes
+            # _________________________________________________________________
             for cluster_name in splitted_indexes_train:
                 current_labels_train = labels_per_cluster_train[cluster_name]
                 current_samples_train = samples_per_cluster_train[cluster_name]
-                current_labels_test = labels_per_cluster_test[cluster_name]
-                current_samples_test = samples_per_cluster_test[cluster_name]
+                # current_labels_test = labels_per_cluster_test[cluster_name]
+                # current_samples_test = samples_per_cluster_test[cluster_name]
 
                 # Create the training set for each node
                 (
                     splitted_indexes_train_nodes,
                     labels_per_cluster_train_nodes,
                     samples_per_cluster_train_nodes,
+                    distribution_per_labels,
                 ) = FederatedDataset.partition_data(
                     data=MyDataset(
                         samples=current_samples_train,
@@ -215,6 +208,7 @@ class FederatedDataset:
                 validation_labels = {}
                 train_labels = {}
 
+                # train-validation split
                 for node_name in splitted_indexes_train_nodes:
                     indexes = splitted_indexes_train_nodes[node_name]
                     labels = labels_per_cluster_train_nodes[node_name]
@@ -232,15 +226,18 @@ class FederatedDataset:
                         list(set(range(len(indexes))) - set(sampled_validation_indexes))
                     )
 
-                    validation_indexes[node_name] = indexes[sampled_validation_indexes]
-                    train_indexes[node_name] = indexes
-                    validation_labels[node_name] = np.array(labels)[
-                        sampled_validation_indexes
-                    ]
-                    train_labels[node_name] = labels
-                    print(
-                        f"Node {node_name} - Cluster {cluster_name} has {len(indexes)} samples - {len(sampled_validation_indexes)} Validation Set - {len(sampled_train_indexes)} Train Set"
-                    )
+
+                    if len(sampled_validation_indexes) > 0:
+                        indexes = np.array(indexes) if isinstance(indexes, list) else indexes
+                        validation_indexes[node_name] = indexes[sampled_validation_indexes]
+                        train_indexes[node_name] = indexes
+                        validation_labels[node_name] = np.array(labels)[
+                            sampled_validation_indexes
+                        ]
+                        train_labels[node_name] = labels
+                        print(
+                            f"Node {node_name} - Cluster {cluster_name} has {len(indexes)} samples - {len(sampled_validation_indexes)} Validation Set - {len(sampled_train_indexes)} Train Set"
+                        )
 
                 cluster_splits_train.append(
                     (
@@ -258,36 +255,6 @@ class FederatedDataset:
                     ),
                 )
 
-                # Create the test set for each node
-                (
-                    splitted_indexes_test_nodes,
-                    labels_per_cluster_test_nodes,
-                    samples_per_cluster_test_nodes,
-                ) = FederatedDataset.partition_data(
-                    data=MyDataset(
-                        samples=current_samples_test,
-                        targets=current_labels_test,
-                        transform=train_ds.transform,
-                    ),
-                    split_type=split_type_nodes,
-                    num_partitions=num_nodes,
-                    alpha=alpha,
-                    num_classes=num_classes,
-                    phase="node",
-                    max_size=max_size,
-                )
-
-                cluster_splits_test.append(
-                    (
-                        cluster_name,
-                        splitted_indexes_test_nodes,
-                        labels_per_cluster_test_nodes,
-                    )
-                )
-                # At the end of this loop we have a list of tuples. Each tuple contains
-                # The name of the clusters, the indexes of the samples for each node
-                # and the labels for each node.
-
         elif num_nodes:
             # In this second case we only want to partition the dataset among
             # the nodes.
@@ -295,6 +262,7 @@ class FederatedDataset:
                 splitted_indexes_train,
                 labels_per_cluster_train,
                 samples_per_cluster_train,
+                _,
             ) = FederatedDataset.partition_data(
                 data=train_ds,
                 split_type=split_type_nodes,
@@ -308,6 +276,7 @@ class FederatedDataset:
                 splitted_indexes_test,
                 labels_per_cluster_test,
                 samples_per_cluster_test,
+                _,
             ) = FederatedDataset.partition_data(
                 data=test_ds,
                 split_type=split_type_nodes,
@@ -355,9 +324,83 @@ class FederatedDataset:
         # clusters and among the nodes and the one in which we splitted only
         # among the nodes
         if cluster_splits_train:
-            partitions_train = (
+            # In partition train abbiamo sia public che privato? In caso vanno
+            # separati per fare in modo di avere diversi transformation
+
+            transform_public_mnist = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.1307,), (0.3081,)),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(p=0.5),
+                    transforms.RandomRotation(degrees=(90, 240)),
+                    # transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
+                ],
+            )
+
+            cluster_split_train_public = []
+            cluster_split_train_private = []
+            for cluster_name, indexes_cluster, labels_cluster in cluster_splits_train:
+                tmp_dict_indexes_public = {}
+                tmp_dict_indexes_private = {}
+                for node_name, node_indexes in indexes_cluster.items():
+                    if "_public" in node_name:
+                        tmp_dict_indexes_public[node_name] = node_indexes
+                    else:
+                        tmp_dict_indexes_private[node_name] = node_indexes
+                tmp_dict_labels_public = {}
+                tmp_dict_labels_private = {}
+                for node_name, node_labels in labels_cluster.items():
+                    if "_public" in node_name:
+                        tmp_dict_labels_public[node_name] = node_labels
+                    else:
+                        tmp_dict_labels_private[node_name] = node_labels
+
+                cluster_split_train_public.append(
+                    (cluster_name, tmp_dict_indexes_public, tmp_dict_labels_public),
+                )
+                cluster_split_train_private.append(
+                    (cluster_name, tmp_dict_indexes_private, tmp_dict_labels_private),
+                )
+
+            cluster_split_validation_public = []
+            cluster_split_validation_private = []
+            for cluster_name, indexes_cluster, labels_cluster in cluster_splits_validation:
+                tmp_dict_indexes_public = {}
+                tmp_dict_indexes_private = {}
+                for node_name, node_indexes in indexes_cluster.items():
+                    if "_public" in node_name:
+                        tmp_dict_indexes_public[node_name] = node_indexes
+                    else:
+                        tmp_dict_indexes_private[node_name] = node_indexes
+                tmp_dict_labels_public = {}
+                tmp_dict_labels_private = {}
+                for node_name, node_labels in labels_cluster.items():
+                    if "_public" in node_name:
+                        tmp_dict_labels_public[node_name] = node_labels
+                    else:
+                        tmp_dict_labels_private[node_name] = node_labels
+
+                cluster_split_validation_public.append(
+                    (cluster_name, tmp_dict_indexes_public, tmp_dict_labels_public),
+                )
+                cluster_split_validation_private.append(
+                    (cluster_name, tmp_dict_indexes_private, tmp_dict_labels_private),
+                )
+
+            partitions_train_public = (
                 FederatedDataset.create_partitioned_dataset_with_clusters(
-                    cluster_splits=cluster_splits_train,
+                    cluster_splits=cluster_split_train_public,
+                    targets_per_class=targets_train_per_class,
+                    dataset_with_csv=dataset_with_csv,
+                    dataset=train_ds,
+                    image_path=image_path_train,
+                    transform=transform_public_mnist,
+                )
+            )
+            partitions_train_private = (
+                FederatedDataset.create_partitioned_dataset_with_clusters(
+                    cluster_splits=cluster_split_train_private,
                     targets_per_class=targets_train_per_class,
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
@@ -366,49 +409,36 @@ class FederatedDataset:
                 )
             )
 
-            partitions_test = FederatedDataset.create_partitioned_dataset_with_clusters(
-                cluster_splits=cluster_splits_test,
-                targets_per_class=targets_test_per_class,
-                dataset_with_csv=dataset_with_csv,
-                dataset=test_ds,
-                image_path=image_path_test,
-                transform=transform_test,
-            )
+            # partitions_test = FederatedDataset.create_partitioned_dataset_with_clusters(
+            #     cluster_splits=cluster_splits_test,
+            #     targets_per_class=targets_test_per_class,
+            #     dataset_with_csv=dataset_with_csv,
+            #     dataset=test_ds,
+            #     image_path=image_path_test,
+            #     transform=transform_test,
+            #     test=True,
+            # )
 
-            merged_split_validation = []
-            for cluster_distribution in cluster_splits_validation:
-                cluster_name = cluster_distribution[0]
-                tmp_dict = {}
-                tmp_dict_labels = {}
-                for node_name, node_indexes in cluster_distribution[1].items():
-                    if "_private" in node_name:
-                        new_name = node_name.split("_private")[0]
-                    else:
-                        new_name = node_name.split("_public")[0]
-                    if new_name not in tmp_dict:
-                        tmp_dict[new_name] = []
-                    tmp_dict[new_name] += list(node_indexes)
-                for node_name, node_labels in cluster_distribution[2].items():
-                    if "_private" in node_name:
-                        new_name = node_name.split("_private")[0]
-                    else:
-                        new_name = node_name.split("_public")[0]
-                    if new_name not in tmp_dict_labels:
-                        tmp_dict_labels[new_name] = []
-                    tmp_dict_labels[new_name] += list(node_labels)
-
-                merged_split_validation.append(
-                    (cluster_name, tmp_dict, tmp_dict_labels),
-                )
-
-            partitions_validation = (
+            partitions_validation_public = (
                 FederatedDataset.create_partitioned_dataset_with_clusters(
-                    cluster_splits=merged_split_validation,
+                    cluster_splits=cluster_split_validation_public,
                     targets_per_class=targets_validation_per_class,
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_test,
-                    transform=transform_test,
+                    transform=transform_public_mnist,
+                    validation=True,
+                )
+            )
+
+            partitions_validation_private = (
+                FederatedDataset.create_partitioned_dataset_with_clusters(
+                    cluster_splits=cluster_split_validation_private,
+                    targets_per_class=targets_validation_per_class,
+                    dataset_with_csv=dataset_with_csv,
+                    dataset=train_ds,
+                    image_path=image_path_test,
+                    transform=transform_train,
                     validation=True,
                 )
             )
@@ -432,55 +462,71 @@ class FederatedDataset:
             )
 
         # Now we can store the partitioned datasets
+        # FederatedDataset.store_partitioned_datasets(
+        #     partitions_train,
+        #     store_path=store_path,
+        #     split_name="train",
+        # )
         FederatedDataset.store_partitioned_datasets(
-            partitions_train,
+            partitions_train_public,
             store_path=store_path,
             split_name="train",
         )
         FederatedDataset.store_partitioned_datasets(
-            partitions_test,
+            partitions_train_private,
             store_path=store_path,
-            split_name="test",
+            split_name="train",
         )
+        
+        if partitions_test:
+            FederatedDataset.store_partitioned_datasets(
+                partitions_test,
+                store_path=store_path,
+                split_name="test",
+            )
 
         FederatedDataset.store_partitioned_datasets(
-            partitions_validation,
+            partitions_validation_public,
             store_path=store_path,
             split_name="validation",
         )
 
-        validation_test = IIDPartition.do_iid_partitioning_with_indexes(
-            indexes=torch.tensor(range(len(test_ds.targets))), num_partitions=2
-        )
-        validation_indexes = validation_test[0]
-        test_indexes = validation_test[1]
 
-        if dataset_with_csv:
-            validation_partition = MyDatasetWithCSV(
-                targets=np.array(test_ds.targets)[validation_indexes]
-                if isinstance(test_ds.targets, list)
-                else test_ds.targets[validation_indexes],
-                image_path=image_path_test,
-                image_ids=np.array(test_ds.samples)[validation_indexes],
-                transform=test_ds.transform,
-                sensitive_features=torch.tensor(test_ds.sensitive_features)[
-                    validation_indexes
-                ]
-                if hasattr(test_ds, "sensitive_features")
-                else None,
-            )
-        else:
-            validation_partition = MyDataset(
-                targets=test_ds.targets[validation_indexes],
-                samples=np.array(test_ds.data)[validation_indexes],
-                transform=train_ds.transform,
-            )
-
-        FederatedDataset.store_validation_set(
-            validation_partition,
+        FederatedDataset.store_partitioned_datasets(
+            partitions_validation_private,
             store_path=store_path,
-            split_name="server_validation_set",
+            split_name="validation",
         )
+
+
+        test_indexes = range(len(test_ds.targets))  # validation_test[1]
+
+        # if dataset_with_csv:
+        #     validation_partition = MyDatasetWithCSV(
+        #         targets=np.array(test_ds.targets)[validation_indexes]
+        #         if isinstance(test_ds.targets, list)
+        #         else test_ds.targets[validation_indexes],
+        #         image_path=image_path_test,
+        #         image_ids=np.array(test_ds.samples)[validation_indexes],
+        #         transform=test_ds.transform,
+        #         sensitive_features=torch.tensor(test_ds.sensitive_features)[
+        #             validation_indexes
+        #         ]
+        #         if hasattr(test_ds, "sensitive_features")
+        #         else None,
+        #     )
+        # else:
+        #     validation_partition = MyDataset(
+        #         targets=test_ds.targets[validation_indexes],
+        #         samples=np.array(test_ds.data)[validation_indexes],
+        #         transform=train_ds.transform,
+        #     )
+
+        # FederatedDataset.store_validation_set(
+        #     validation_partition,
+        #     store_path=store_path,
+        #     split_name="server_validation_set",
+        # )
 
         if dataset_with_csv:
             test_partition = MyDatasetWithCSV(
@@ -574,8 +620,10 @@ class FederatedDataset:
         partition_type: str = None,
         phase: str = None,
         max_size: float = None,
+        previous_distribution_per_labels: dict = None,
     ):
         print(f"NUM CLASSES {num_classes}")
+        distribution_per_labels = None
         samples_per_cluster_train = []
         if split_type == "iid":
             (
@@ -603,12 +651,14 @@ class FederatedDataset:
                 splitted_indexes_train,
                 labels_per_cluster_train,
                 samples_per_cluster_train,
+                distribution_per_labels,
             ) = NonIIDPartition.do_partitioning(
                 dataset=data,
                 num_partitions=num_partitions,
                 total_num_classes=num_classes,
                 alpha=alpha,
                 phase=phase,
+                previous_distribution_per_labels=previous_distribution_per_labels,
             )
         elif split_type == "non_iid_double":
             (
@@ -645,28 +695,19 @@ class FederatedDataset:
                     alpha=alpha,
                 )
         elif split_type == "non_iid_public_private_different_distribution":
-            if partition_type == "train":
-                (
-                    splitted_indexes_train,
-                    labels_per_cluster_train,
-                ) = NonIIDPartitionPublicPrivate.do_partitioning_different_distribution_nodes(
-                    dataset=data,
-                    num_partitions=num_partitions,
-                    total_num_classes=num_classes,
-                    alpha=alpha,
-                    max_size=max_size,
-                )
-            else:
-                (
-                    splitted_indexes_train,
-                    labels_per_cluster_train,
-                    samples_per_cluster_train,
-                ) = NonIIDPartition.do_partitioning(
-                    dataset=data,
-                    num_partitions=num_partitions,
-                    total_num_classes=num_classes,
-                    alpha=alpha,
-                )
+            (
+                splitted_indexes_train,
+                labels_per_cluster_train,
+                distribution_per_labels,
+            ) = NonIIDPartitionPublicPrivate.do_partitioning_different_distribution_nodes(
+                dataset=data,
+                num_partitions=num_partitions,
+                total_num_classes=num_classes,
+                alpha=alpha,
+                max_size=max_size,
+                previous_distribution_per_labels=previous_distribution_per_labels,
+            )
+
         elif split_type == "non_iid_nodes":
             (
                 splitted_indexes_train,
@@ -701,6 +742,7 @@ class FederatedDataset:
             splitted_indexes_train,
             labels_per_cluster_train,
             samples_per_cluster_train,
+            distribution_per_labels,
         )
 
     def create_partitioned_dataset(
@@ -760,9 +802,12 @@ class FederatedDataset:
         image_path,
         transform,
         validation=False,
+        test=False,
     ):
         if validation:
-            print("------------------------------------")
+            print("--------------- Validation ---------------------")
+        if test:
+            print("--------------- Test --------------------")
         partitions = {}
         counter_partitions = {}
         for (

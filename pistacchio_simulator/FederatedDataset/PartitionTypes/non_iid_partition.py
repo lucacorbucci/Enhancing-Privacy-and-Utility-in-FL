@@ -11,6 +11,7 @@ class NonIIDPartition:
         total_num_classes: int,
         phase: str = None,
         alpha=1000000,
+        previous_distribution_per_labels: dict = None,
     ) -> dict:
         if not alpha:
             raise ValueError("Alpha must be a positive number")
@@ -26,6 +27,7 @@ class NonIIDPartition:
             )
         )
         idx = torch.tensor(list(range(len(labels))))
+        distribution_per_labels = {}
 
         index_per_label = {}
         for index, label in zip(idx, labels):
@@ -47,14 +49,25 @@ class NonIIDPartition:
             distribution = np.random.dirichlet(num_partitions * [alpha], size=1)
             # we have to sample from the group of samples that have label equal
             # to label and not from the entire labels list.
-            selected_labels = labels[labels == label]
-            tmp_to_be_sampled = np.random.choice(
-                num_partitions, len(selected_labels), p=distribution[0]
-            )
-            # Inside to_be_sampled we save a counter for each label
-            # The counter is the number of samples that we want to sample for each
-            # partition
-            to_be_sampled.append(Counter(tmp_to_be_sampled))
+
+            distribution = None
+            if previous_distribution_per_labels:
+                if label in previous_distribution_per_labels:
+                    distribution = previous_distribution_per_labels[label]
+            else:
+                # For each label we want a distribution over the num_partitions
+                distribution = np.random.dirichlet(num_partitions * [alpha], size=1)
+                distribution_per_labels[label] = distribution
+
+            if distribution is not None:
+                selected_labels = labels[labels == label]
+                tmp_to_be_sampled = np.random.choice(
+                    num_partitions, len(selected_labels), p=distribution[0]
+                )
+                # Inside to_be_sampled we save a counter for each label
+                # The counter is the number of samples that we want to sample for each
+                # partition
+                to_be_sampled.append(Counter(tmp_to_be_sampled))
         # create the partitions
         partitions_index = {
             f"{name}{cluster_name}": [] for cluster_name in range(0, num_partitions)
@@ -87,7 +100,12 @@ class NonIIDPartition:
             cluster: data[indexes] for cluster, indexes in partitions_index.items()
         }
 
-        return partitions_index, partitions_labels, partitions_data
+        return (
+            partitions_index,
+            partitions_labels,
+            partitions_data,
+            distribution_per_labels,
+        )
 
     def do_partitioning_double(
         dataset: torch.utils.data.Dataset,

@@ -17,10 +17,12 @@ from torchvision import models
 from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
 from pistacchio_simulator.Models.celeba import CelebaNet
 from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.linear_classification_net import (
+    LinearClassificationNet,
+)
 from pistacchio_simulator.Models.mnist import MnistNet
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
-
 
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
@@ -70,6 +72,9 @@ class Utils:
         ):
             model = Utils.get_model_to_fine_tune()
             preferences.fine_tuning = True
+        elif preferences.dataset == "income":
+            model = LinearClassificationNet(input_size=53, output_size=2)
+
         else:
             raise InvalidDatasetNameError("Invalid dataset name")
         return model
@@ -450,5 +455,7 @@ class Utils:
             raise ValueError("The two lists must not be empty")
 
         zipped_list = list(zip(first_list, second_list))
+        random.shuffle(zipped_list)
+        return zip(*zipped_list)
         random.shuffle(zipped_list)
         return zip(*zipped_list)

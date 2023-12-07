@@ -16,6 +16,7 @@ class PartitionConfig(BaseModel):
     server_test_set: str = Field(...)
     max_size: Optional[float] = None
     validation_size: Optional[float] = 0
+    seed: int = Field(...)
 
 
 class P2PConfig(BaseModel):

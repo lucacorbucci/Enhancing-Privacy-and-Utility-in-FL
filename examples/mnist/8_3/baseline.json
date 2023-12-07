@@ -15,7 +15,7 @@
         "num_nodes": 3,
         "num_clusters": 8,
         "noniid_nodes_distribution": true,
-        "alpha": 100.0,
+        "alpha": 5.0,
         "server_test_set": "server_test_set.pt",
         "store_path": "../data/mnist/federated_data"
     },

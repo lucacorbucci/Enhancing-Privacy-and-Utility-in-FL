@@ -2,13 +2,14 @@ import numpy as np
 import torch
 from loguru import logger
 from opacus.utils.batch_memory_manager import BatchMemoryManager
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from torch import nn
+
 from pistacchio_simulator.Exceptions.errors import (
     NotYetInitializedFederatedLearningError,
 )
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
-from torch import nn
 
 
 class Learning:
@@ -131,13 +132,15 @@ class Learning:
                 y_true = [item.item() for item in y_true]
                 y_pred = [item.item() for item in y_pred]
 
-                f1score = f1_score(y_true, y_pred, average="macro")
-                precision = precision_score(y_true, y_pred, average="macro")
-                recall = recall_score(y_true, y_pred, average="macro")
-
-                cm = confusion_matrix(y_true, y_pred)
-                cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
-                accuracy_per_class = cm.diagonal()
+                # f1score = f1_score(y_true, y_pred, average="macro")
+                # precision = precision_score(y_true, y_pred, average="macro")
+                # recall = recall_score(y_true, y_pred, average="macro")
+                precision = 0
+                recall = 0
+                f1score = 0
+                # cm = confusion_matrix(y_true, y_pred)
+                # cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+                # accuracy_per_class = cm.diagonal()
 
                 return (
                     test_loss,
@@ -145,7 +148,6 @@ class Learning:
                     f1score,
                     precision,
                     recall,
-                    accuracy_per_class,
                 )
 
             raise NotYetInitializedFederatedLearningError

@@ -10,13 +10,14 @@ import torch
 from loguru import logger
 from opacus import PrivacyEngine
 from opacus.utils.batch_memory_manager import BatchMemoryManager
+from torch import Tensor, nn
+
 from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.performances import Performances
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-from torch import Tensor, nn
 
 logger.remove()
 logger.add(
@@ -47,10 +48,9 @@ def train(model, train_loader, optimizer, epoch, device, privacy_engine):
         max_physical_batch_size=128,
         optimizer=optimizer,
     ) as memory_safe_data_loader:
-        for i, (images, target) in enumerate(memory_safe_data_loader):
+        for _, (images, target) in enumerate(memory_safe_data_loader):
             optimizer.zero_grad()
-            model.to(device)
-
+            
             images = images.to(device)
             target = target.to(device)
 
@@ -161,19 +161,34 @@ class FederatedNode:
         print(
             f"NODE NAME {self.node_name} has {Counter([target.item() for target in self.train_set.targets])}"
         )
-        self.test_set = DataLoader().load_splitted_dataset(
-            f"{self.preferences.data_split_config.store_path}/{self.node_name}_test.pt",
-        )
-
+        # self.test_set = DataLoader().load_splitted_dataset(
+        #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_test.pt",
+        # )
         if self.phase == Phase.P2P:
             batch_size = self.preferences.p2p_config.batch_size
         else:
             batch_size = self.preferences.server_config.batch_size
-
+        print(f"Batch size {batch_size}")
+        
         if self.preferences.data_split_config.validation_size > 0:
-            self.validation_set = DataLoader().load_splitted_dataset(
-                f"{self.preferences.data_split_config.store_path}/{self.node_name}_validation.pt",
-            )
+            if self.preferences.public_private_experiment and self.phase == Phase.P2P:
+                if self.preferences.dataset_p2p:
+                    # self.train_set = DataLoader().load_splitted_dataset(
+                    #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_train.pt",
+                    # )
+                    self.validation_set = DataLoader().load_splitted_dataset(
+                        f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_validation.pt",
+                    )
+            elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
+                if self.preferences.dataset_server:
+                    # self.train_set = DataLoader().load_splitted_dataset(
+                    #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_train.pt",
+                    # )
+                    self.validation_set = DataLoader().load_splitted_dataset(
+                        f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_validation.pt",
+                    )
+           
+            
             self.validation_loader = torch.utils.data.DataLoader(
                 self.validation_set,
                 batch_size=batch_size,
@@ -188,14 +203,11 @@ class FederatedNode:
             num_workers=0,
         )
 
-        print(self.train_loader.dataset.targets)
+        print("train ", len(self.train_loader.dataset))
+        print("test ", len(self.validation_loader.dataset))
 
-        self.test_loader = torch.utils.data.DataLoader(
-            self.test_set,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=0,
-        )
+
+     
 
     def load_accountant(self):
         accountant = None
@@ -242,24 +254,20 @@ class FederatedNode:
         phase: Phase,
         # results: dict | None = None,
     ) -> tuple[list[float], list[float], list[float]]:
-        # accountant = self.load_accountant()
-        # privacy_engine = PrivacyEngine(accountant="rdp")
-        # if accountant:
-        #     privacy_engine.accountant = accountant
-
-        model = Utils.get_model(preferences=self.preferences).to(self.device)
+        model = Utils.get_model(preferences=self.preferences)
+        model = model.to(self.device)
         Utils.set_params(model, self.weights)
 
         optimizer = Utils.get_optimizer(
             preferences=self.preferences, model=model, phase=phase
         )
 
-        model = model.to(self.device)
+        # model = model.to(self.device)
 
         (
             private_model,
             private_optimizer,
-            train_loader,
+            private_train_loader,
         ) = self.init_differential_privacy(
             phase=phase,
             optimizer=optimizer,
@@ -275,7 +283,7 @@ class FederatedNode:
         for local_epoch in range(local_epochs):
             train_loss, accuracy, epsilon = train(
                 model=private_model,
-                train_loader=train_loader,
+                train_loader=private_train_loader,
                 optimizer=private_optimizer,
                 epoch=local_epoch,
                 device=self.device,
@@ -285,11 +293,9 @@ class FederatedNode:
 
         # Evaluate the model on validation set
         if self.validation_loader is not None:
-            print("LEN: ", len(self.validation_loader.dataset))
             (
                 validation_loss,
                 validation_accuracy,
-                _,
                 _,
                 _,
                 _,
@@ -298,28 +304,25 @@ class FederatedNode:
                 test_loader=self.validation_loader,
                 device=self.device,
             )
-        else:
-            print("NON HO IL VALIDATION SET")
 
         # Evaluate the model on test set
-        if self.test_set:
-            (
-                test_loss,
-                test_accuracy,
-                _,
-                _,
-                _,
-                _,
-            ) = Learning.evaluate_model(
-                model=private_model,
-                test_loader=self.test_loader,
-                device=self.device,
-            )
+        # if self.test_set:
+        #     (
+        #         test_loss,
+        #         test_accuracy,
+        #         _,
+        #         _,
+        #         _,
+        #     ) = Learning.evaluate_model(
+        #         model=private_model,
+        #         test_loader=self.test_loader,
+        #         device=self.device,
+        #     )
 
         metrics["validation_loss"] = torch.tensor(validation_loss)
-        metrics["test_loss"] = torch.tensor(test_loss)
+        # metrics["test_loss"] = torch.tensor(test_loss)
         metrics["validation_accuracy"] = torch.tensor(validation_accuracy)
-        metrics["test_accuracy"] = torch.tensor(test_accuracy)
+        # metrics["test_accuracy"] = torch.tensor(test_accuracy)
 
         # We need to store the state of the privacy engine and all the
         # details about the private training

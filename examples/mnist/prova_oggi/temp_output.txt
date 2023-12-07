@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_p2p_08.yaml
+wandb: Created sweep with ID: b8lgcfce
+wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/b8lgcfce
+wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/b8lgcfce

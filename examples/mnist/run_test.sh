@@ -1,15 +1,8 @@
-# cd ./3_8
-# sh run_sweep.sh
-# cd ../
-
-cd ./5_4
+cd ./0_public_100_private
 sh run_sweep.sh
 cd ../
 
-# cd ./8_3
-# sh run_sweep.sh
-# cd ../
 
-cd ./10_4
+cd ./100_public_0_private
 sh run_sweep.sh
 cd ../
