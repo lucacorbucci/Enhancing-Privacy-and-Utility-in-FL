@@ -47,6 +47,40 @@ class TabularDataset(Dataset):
         return x_sample, y_sample
 
 
+
+class TabularDataset(Dataset):
+    def __init__(self, x, z, y, transform = None):
+        """
+        Initialize the custom dataset with x (features), z (sensitive values), and y (targets).
+
+        Args:
+        x (list of tensors): List of input feature tensors.
+        z (list): List of sensitive values.
+        y (list): List of target values.
+        """
+        self.data = x
+        self.targets = y
+        self.indexes = range(len(self.data))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """
+        Get a single data point from the dataset.
+
+        Args:
+        idx (int): Index to retrieve the data point.
+
+        Returns:
+        sample (dict): A dictionary containing 'x', 'z', and 'y'.
+        """
+        x_sample = self.samples[idx]
+        y_sample = self.targets[idx]
+
+        return x_sample, y_sample
+
 class MyDataset(Dataset):
     """Definition of generic custom dataset."""
 

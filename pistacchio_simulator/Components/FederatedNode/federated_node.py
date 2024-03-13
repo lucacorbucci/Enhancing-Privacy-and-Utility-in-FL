@@ -50,8 +50,9 @@ def train(model, train_loader, optimizer, epoch, device, privacy_engine):
     ) as memory_safe_data_loader:
         for _, (images, target) in enumerate(memory_safe_data_loader):
             optimizer.zero_grad()
-            
+
             images = images.to(device)
+            target = target.long()
             target = target.to(device)
 
             # compute output
@@ -255,7 +256,7 @@ class FederatedNode:
         # results: dict | None = None,
     ) -> tuple[list[float], list[float], list[float]]:
         model = Utils.get_model(preferences=self.preferences)
-        model = model.to(self.device)
+        model.to(self.device)
         Utils.set_params(model, self.weights)
 
         optimizer = Utils.get_optimizer(
@@ -273,6 +274,8 @@ class FederatedNode:
             optimizer=optimizer,
             model=model,
         )
+        private_model.to(self.device)
+        print("TO DEVICE", self.device)
 
         local_epochs = (
             self.preferences.server_config.local_training_epochs

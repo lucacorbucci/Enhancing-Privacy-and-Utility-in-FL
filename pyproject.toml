@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "pistacchio-fl-simulator"
+name = "pistacchio_simulator"
 version = "0.1.0"
 description = "A simulator framework for Federated Learning for research purposes."
 authors = ["Luca Corbucci"]
 license = "MIT"
 readme = "README.md"
-packages = [ { include = "pistacchio-simulator" } ]
+packages = [ { include = "pistacchio_simulator" } ]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -20,13 +20,14 @@ wandb = "^0.14.0"
 pandas = "^1.5.3"
 dill = "^0.3.6"
 multiprocess = "^0.70.14"
-torchvision = "^0.15.1"
 pydantic = "^1.10.4"
 ruff = "^0.1.2"
 pydoc-markdown = "^4.6.4"
 loguru = "^0.6.0"
 opacus = {git = "https://github.com/pytorch/opacus.git"}
-torch = "2.0.0"
+torchvision = "^0.16.1"
+torch = "^2.1.1"
+
 
 
 [tool.poetry.group.dev.dependencies]

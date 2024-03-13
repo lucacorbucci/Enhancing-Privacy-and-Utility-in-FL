@@ -66,6 +66,8 @@ class Utils:
         #     model = CelebaGenderNet()
         elif preferences.dataset == "fashion_mnist":
             model = FashionMnistNet()
+        elif preferences.dataset == "dutch":
+            model = LinearClassificationNet(input_size=11, output_size=2)
         elif (
             preferences.dataset == "imaginette"
             or preferences.dataset == "imaginette_csv"

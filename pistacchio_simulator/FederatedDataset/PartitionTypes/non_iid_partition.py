@@ -61,6 +61,7 @@ class NonIIDPartition:
 
             if distribution is not None:
                 selected_labels = labels[labels == label]
+                print(num_partitions, len(selected_labels), distribution[0])
                 tmp_to_be_sampled = np.random.choice(
                     num_partitions, len(selected_labels), p=distribution[0]
                 )

@@ -116,6 +116,7 @@ class Learning:
                 losses = []
                 with torch.no_grad():
                     for data, target in test_loader:
+                        target = target.long()
                         data, target = data.to(device), target.to(device)
                         outputs = model(data)
                         total += target.size(0)

@@ -1,8 +1,12 @@
+import random
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 import torchvision
+from scipy.io import arff
+from sklearn.preprocessing import MinMaxScaler
 from torchvision import datasets, transforms
 
 from pistacchio_simulator.FederatedDataset.Utils.custom_dataset import (
@@ -10,6 +14,7 @@ from pistacchio_simulator.FederatedDataset.Utils.custom_dataset import (
     # CelebaGenderDataset,
     ImaginetteDataset,
     MyDataset,
+    TabularDataset,
 )
 
 
@@ -40,6 +45,8 @@ class DatasetDownloader:
             train_ds, test_ds = DatasetDownloader.download_cifar10()
         elif dataset_name == "adult":
             train_ds, test_ds = DatasetDownloader.download_adult()
+        elif dataset_name == "dutch":
+            train_ds, test_ds = DatasetDownloader.download_dutch()
         elif dataset_name == "celeba":
             train_ds, test_ds = DatasetDownloader.download_celeba()
         # elif dataset_name == "celeba_sensitive_feature":
@@ -231,71 +238,6 @@ class DatasetDownloader:
         )
         return train_dataset, test_dataset
 
-    # @staticmethod
-    # def download_celeba_sensitive_feature() -> (
-    #     Tuple[
-    #         torchvision.datasets.CelebA,
-    #         torchvision.datasets.CelebA,
-    #     ]
-    # ):
-    #     """This function downloads the mnist dataset.
-
-    #     Returns
-    #     -------
-    #         Tuple[torchvision.datasets.MNIST, torchvision.datasets.MNIST]:
-    #         the train and test dataset
-    #     """
-    #     transform = transforms.Compose(
-    #         [
-    #             transforms.RandomHorizontalFlip(0.5),
-    #             transforms.Resize((64, 64)),
-    #         ],
-    #     )
-    #     train_dataset = CelebaDataset(
-    #         csv_path="../data/celeba/train.csv",
-    #         image_path="../data/celeba/img_align_celeba",
-    #         transform=transform,
-    #         debug=True,
-    #     )
-    #     test_dataset = CelebaDataset(
-    #         csv_path="../data/celeba/test.csv",
-    #         image_path="../data/celeba/img_align_celeba",
-    #         transform=transform,
-    #         debug=True,
-    #     )
-    #     return train_dataset, test_dataset
-
-    # @staticmethod
-    # def download_celeba_gender() -> (
-    #     Tuple[
-    #         torchvision.datasets.CelebA,
-    #         torchvision.datasets.CelebA,
-    #     ]
-    # ):
-    #     """This function downloads the mnist dataset.
-
-    #     Returns
-    #     -------
-    #         Tuple[torchvision.datasets.MNIST, torchvision.datasets.MNIST]:
-    #         the train and test dataset
-    #     """
-    #     transform = transforms.Compose(
-    #         [
-    #             transforms.RandomHorizontalFlip(0.5),
-    #             transforms.Resize((64, 64)),
-    #         ],
-    #     )
-    #     train_dataset = CelebaGenderDataset(
-    #         csv_path="../data/celeba/train_gender.csv",
-    #         image_path="../data/celeba/img_align_celeba",
-    #         transform=transform,
-    #     )
-    #     test_dataset = CelebaGenderDataset(
-    #         csv_path="../data/celeba/test_gender.csv",
-    #         image_path="../data/celeba/img_align_celeba",
-    #         transform=transform,
-    #     )
-    #     return train_dataset, test_dataset
 
     @staticmethod
     def download_cifar10() -> (
@@ -338,6 +280,144 @@ class DatasetDownloader:
         )
         return cifar_train_ds, cifar_test_ds
 
+    ## Use this function to retrieve X, X, y arrays for training ML models
+    @staticmethod
+    def dataset_to_numpy(
+        _df,
+        _feature_cols: list,
+        _metadata: dict,
+        num_sensitive_features: int = 1,
+        sensitive_features_last: bool = True,
+    ):
+        """Args:
+        _df: pandas dataframe
+        _feature_cols: list of feature column names
+        _metadata: dictionary with metadata
+        num_sensitive_features: number of sensitive features to use
+        sensitive_features_last: if True, then sensitive features are encoded as last columns
+        """
+
+        # transform features to 1-hot
+        _X = _df[_feature_cols]
+        # take sensitive features separately
+        print(
+            f'Using {_metadata["protected_atts"][:num_sensitive_features]} as sensitive feature(s).'
+        )
+        if num_sensitive_features > len(_metadata["protected_atts"]):
+            num_sensitive_features = len(_metadata["protected_atts"])
+        _Z = _X[_metadata["protected_atts"][:num_sensitive_features]]
+        _X = _X.drop(columns=_metadata["protected_atts"][:num_sensitive_features])
+        # 1-hot encode and scale features
+        if "dummy_cols" in _metadata.keys():
+            dummy_cols = _metadata["dummy_cols"]
+        else:
+            dummy_cols = None
+        _X2 = pd.get_dummies(_X, columns=dummy_cols, drop_first=False)
+        esc = MinMaxScaler()
+        _X = esc.fit_transform(_X2)
+
+        # current implementation assumes each sensitive feature is binary
+        for i, tmp in enumerate(_metadata["protected_atts"][:num_sensitive_features]):
+            assert len(_Z[tmp].unique()) == 2, "Sensitive feature is not binary!"
+
+        # 1-hot sensitive features, (optionally) swap ordering so privileged class feature == 1 is always last, preceded by the corresponding unprivileged feature
+        _Z2 = pd.get_dummies(_Z, columns=_Z.columns, drop_first=False)
+        # print(_Z2.head(), _Z2.shape)
+        if sensitive_features_last:
+            for i, tmp in enumerate(_Z.columns):
+                assert (
+                    _metadata["protected_att_values"][i] in _Z[tmp].unique()
+                ), "Protected attribute value not found in data!"
+                if not np.allclose(float(_metadata["protected_att_values"][i]), 0):
+                    # swap columns
+                    _Z2.iloc[:, [2 * i, 2 * i + 1]] = _Z2.iloc[:, [2 * i + 1, 2 * i]]
+        # change booleans to floats
+        # _Z2 = _Z2.astype(float)
+        # _Z = _Z2.to_numpy()
+        _y = _df[_metadata["target_variable"]].values
+        return _X, np.array([sv[0] for sv in _Z.values]), _y
+
+    @staticmethod
+    def download_dutch() -> (
+        Tuple[
+            torch.utils.data.DataLoader,
+            torch.utils.data.DataLoader,
+        ]
+    ):
+        """This function downloads the adult dataset.
+
+        Returns
+        -------
+            Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+            the train and test dataset
+        """
+        
+        data = arff.loadarff("../data/dutch/dutch_census.arff")
+        dutch_df = pd.DataFrame(data[0]).astype("int32")
+
+        dutch_df["sex_binary"] = np.where(dutch_df["sex"] == 1, 1, 0)
+        dutch_df["occupation_binary"] = np.where(dutch_df["occupation"] >= 300, 1, 0)
+
+        del dutch_df["sex"]
+        del dutch_df["occupation"]
+
+        dutch_df_feature_columns = [
+            "age",
+            "household_position",
+            "household_size",
+            "prev_residence_place",
+            "citizenship",
+            "country_birth",
+            "edu_level",
+            "economic_status",
+            "cur_eco_activity",
+            "Marital_status",
+            "sex_binary",
+        ]
+
+        metadata_dutch = {
+            "name": "Dutch census",
+            "code": ["DU1"],
+            "protected_atts": ["sex_binary"],
+            "protected_att_values": [0],
+            "protected_att_descriptions": ["Gender = Female"],
+            "target_variable": "occupation_binary",
+        }
+
+        tmp = DatasetDownloader.dataset_to_numpy(dutch_df, dutch_df_feature_columns, metadata_dutch, num_sensitive_features=1)
+
+        x = tmp[0]
+        y = tmp[2]
+        z = tmp[1]
+
+        xyz = list(zip(x, y, z))
+        random.shuffle(xyz)
+        x, y, z = zip(*xyz)
+        train_size = int(len(y) * 0.8)
+
+        x_train = np.array(x[:train_size])
+        x_test = np.array(x[train_size:])
+        y_train = np.array(y[:train_size])
+        y_test = np.array(y[train_size:])
+        z_train = np.array(z[:train_size])
+        z_test = np.array(z[train_size:])
+
+        train_dataset = TabularDataset(
+            x=np.hstack((x_train, np.ones((x_train.shape[0], 1)))).astype(
+                np.float32
+            ),
+            z=z_train.astype(np.float32),
+            y=y_train.astype(np.float32),
+        )
+
+        test_dataset = TabularDataset(
+            x=np.hstack((x_test, np.ones((x_test.shape[0], 1)))).astype(np.float32),
+            z=z_test.astype(np.float32),
+            y=y_test.astype(np.float32),
+        )
+
+        return train_dataset, test_dataset
+
     @staticmethod
     def download_adult() -> (
         Tuple[
@@ -376,7 +456,4 @@ class DatasetDownloader:
         adult_dataset_train = MyDataset(samples, targets)
         adult_dataset_test = MyDataset(samples_test, targets_test)
 
-        return adult_dataset_train, adult_dataset_test
-        return adult_dataset_train, adult_dataset_test
-        return adult_dataset_train, adult_dataset_test
         return adult_dataset_train, adult_dataset_test

@@ -155,7 +155,7 @@ class FederatedDataset:
                     )
                 else:
                     test_partition_cluster_test = MyDataset(
-                        targets=np.array(test_ds.targets)[indexes],
+                        targets=np.array(test_ds.targets)[indexes].astype(np.float32),
                         samples=np.array(test_ds.data)[indexes],
                         transform=test_ds.transform,
                     )
@@ -164,6 +164,63 @@ class FederatedDataset:
                     test_partition_cluster_test,
                     f"{store_path}/test_{cluster_name}.pt",
                 )
+
+                # test 
+
+                (
+                    _,
+                    _,
+                    _,
+                    distribution_per_labels_nodes,
+                ) = FederatedDataset.partition_data(
+                    data=test_partition_cluster_test,
+                    split_type=split_type_clusters,
+                    num_partitions=num_nodes,
+                    alpha=alpha,
+                    num_classes=num_classes,
+                    phase="cluster",
+                    max_size=max_size,
+                )
+
+                (
+                    node_splitted_indexes_test,
+                    node_labels_per_cluster_test,
+                    node_samples_per_cluster_test,
+                    _,
+                ) = FederatedDataset.partition_data(
+                    data=test_partition_cluster_test,
+                    split_type=split_type_clusters,
+                    num_partitions=num_nodes,
+                    alpha=alpha,
+                    num_classes=num_classes,
+                    phase="cluster",
+                    max_size=int(max_size/num_nodes),
+                    previous_distribution_per_labels=distribution_per_labels_nodes,
+                )
+                for node_number, (_, indexes_node) in enumerate(node_splitted_indexes_test.items()):
+                    
+                    if dataset_with_csv:
+                        test_partition_node_test = MyDatasetWithCSV(
+                            targets=np.array(test_partition_cluster_test.targets)[indexes_node],
+                            image_path=test_partition_cluster_test.image_path,
+                            image_ids=np.array(test_partition_cluster_test.samples)[indexes_node],
+                            transform=test_partition_cluster_test.transform,
+                            sensitive_features=np.array(test_partition_cluster_test.sensitive_features)[indexes_node]
+                            if hasattr(test_partition_cluster_test, "sensitive_features")
+                            else None,
+                        )
+                    else:
+                        test_partition_node_test = MyDataset(
+                            targets=np.array(test_partition_cluster_test.targets)[indexes_node].astype(np.float32),
+                            samples=np.array(test_partition_cluster_test.data)[indexes_node],
+                            transform=test_partition_cluster_test.transform,
+                        )
+
+                    torch.save(
+                        test_partition_node_test,
+                        f"{store_path}/test_node_{node_number}_{cluster_name}.pt",
+                    )
+                
 
             # _________________________________________________________________
             # And then we split the data among the nodes
@@ -183,7 +240,7 @@ class FederatedDataset:
                 ) = FederatedDataset.partition_data(
                     data=MyDataset(
                         samples=current_samples_train,
-                        targets=current_labels_train,
+                        targets=np.array(current_labels_train).astype(np.float32),
                         transform=train_ds.transform,
                     ),
                     split_type=split_type_nodes,
@@ -544,7 +601,7 @@ class FederatedDataset:
             )
         else:
             test_partition = MyDataset(
-                targets=test_ds.targets[test_indexes],
+                targets=np.array(test_ds.targets[test_indexes]).astype(np.float32),
                 samples=np.array(test_ds.data)[test_indexes],
                 transform=train_ds.transform,
             )
@@ -776,7 +833,7 @@ class FederatedDataset:
                 )
             else:
                 train_partition = MyDataset(
-                    targets=dataset.targets[indexes],
+                    targets=dataset.targets[indexes].astype(np.float32),
                     samples=torch.tensor(dataset.data)[indexes].to(torch.float32),
                     transform=train_ds.transform,
                 )
@@ -847,7 +904,7 @@ class FederatedDataset:
                     partitions[cluster_name][node_name] = train_partition
                 else:
                     train_partition = MyDataset(
-                        targets=dataset.targets[indexes],
+                        targets=np.array(dataset.targets[indexes]).astype(np.float32),
                         samples=np.array(dataset.data)[indexes],
                         transform=transform,
                     )
