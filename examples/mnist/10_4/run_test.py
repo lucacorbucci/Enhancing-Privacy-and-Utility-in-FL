@@ -5,12 +5,13 @@ import sys
 import torch
 from loguru import logger
 from opacus import PrivacyEngine
+from pydantic.tools import parse_obj_as
+
 from pistacchio_simulator.Experiments.run_experiments import Experiment
 from pistacchio_simulator.Utils.data_loader import DataLoader
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.utils import Utils
-from pydantic.tools import parse_obj_as
 
 
 def main() -> None:
@@ -145,6 +146,7 @@ def main() -> None:
         for cluster_name in range(preferences.num_clusters):
             for node_name in range(preferences.num_nodes):
                 model_noise = Utils.get_model(preferences=preferences).to(device)
+                print(device)
 
                 # get the training dataset of one of the clients
                 train_set = DataLoader().load_splitted_dataset(

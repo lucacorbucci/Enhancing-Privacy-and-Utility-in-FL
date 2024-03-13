@@ -40,12 +40,12 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:0",
+        "cuda:2",
         "cuda:1"
     ],
     "wandb_config": {
         "tags": [
-            "mnist_8_3"
+            "mnist_02"
         ],
         "name": "Baseline",
         "project_name": "mnist_Sweeps",

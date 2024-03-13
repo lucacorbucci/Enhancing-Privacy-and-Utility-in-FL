@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_server_p2p_0.4.yaml
+wandb: Created sweep with ID: dim9do7b
+wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/dim9do7b
+wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/dim9do7b

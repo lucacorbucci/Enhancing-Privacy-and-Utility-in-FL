@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_baseline_06.yaml
+wandb: Created sweep with ID: kto5nrzb
+wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/kto5nrzb
+wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/kto5nrzb

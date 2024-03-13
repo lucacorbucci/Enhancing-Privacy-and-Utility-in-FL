@@ -1,8 +1,8 @@
-cd ./0_public_100_private
+cd ./prova_oggi
 sh run_sweep.sh
 cd ../
 
 
-cd ./100_public_0_private
+cd ./prova_oggi_inverse
 sh run_sweep.sh
 cd ../

@@ -1,13 +1,13 @@
 {
     "dataset": "mnist",
-    "task_type": "p2p_and_server",
+    "task_type": "fl",
     "dataset_p2p": "public",
     "dataset_server": "private",
     "debug": true,
     "save_model": false,
     "wandb": true,
     "public_private_experiment": true,
-    "pool_size": 20,
+    "pool_size": 40,
     "data_split_config": {
         "split_type_clusters": "non_iid",
         "split_type_nodes": "non_iid_public_private_different_distribution",
@@ -19,7 +19,7 @@
         "server_test_set": "server_test_set.pt",
         "store_path": "../data/mnist/federated_data",
         "max_size": 0.2,
-        "validation_size": 0.8,
+        "validation_size": 0.3,
         "seed": 42
     },
     "p2p_config": {
@@ -47,7 +47,6 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:0",
         "cuda:1"
     ],
     "wandb_config": {

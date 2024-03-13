@@ -35,7 +35,7 @@
         "local_training_epochs": 2,
         "fl_rounds": 20,
         "total_mixed_rounds": 0,
-        "epsilon": 10.0,
+        "epsilon": 5.0,
         "lr": 0.06857897010624767,
         "batch_size": 64
     },
@@ -47,12 +47,12 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:0",
+        "cuda:2",
         "cuda:1"
     ],
     "wandb_config": {
         "tags": [
-            "mnist_8_3"
+            "mnist_02"
         ],
         "name": "P2P+Server",
         "project_name": "mnist_Sweeps",

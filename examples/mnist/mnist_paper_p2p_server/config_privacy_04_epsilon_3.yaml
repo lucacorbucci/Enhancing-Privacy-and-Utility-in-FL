@@ -18,7 +18,10 @@ parameters:
   local_training_epochs_server:
     min: 1
     max: 4
-    
+  clipping:
+    min: 1
+    max: 20
+
 command:
   - ${env}
   - poetry 
@@ -26,5 +29,5 @@ command:
   - python
   - ${program}
   - --config 
-  - baseline_08.json
+  - private_04_epsilon_3.json
   - ${args}

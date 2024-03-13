@@ -20,7 +20,7 @@ parameters:
     max: 4
   clipping:
     min: 1
-    max: 10
+    max: 20
 
 command:
   - ${env}
@@ -29,5 +29,5 @@ command:
   - python
   - ${program}
   - --config 
-  - private_08.json
+  - private_04_epsilon_10.json
   - ${args}
