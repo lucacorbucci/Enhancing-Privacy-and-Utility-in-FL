@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_privacy_03.yaml
+wandb: Created sweep with ID: h58v64ri
+wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/h58v64ri
+wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/h58v64ri

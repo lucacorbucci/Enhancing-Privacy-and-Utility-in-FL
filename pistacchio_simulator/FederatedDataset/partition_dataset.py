@@ -391,7 +391,6 @@ class FederatedDataset:
                     transforms.RandomHorizontalFlip(),
                     transforms.RandomVerticalFlip(p=0.5),
                     transforms.RandomRotation(degrees=(90, 240)),
-                    # transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
                 ],
             )
 
@@ -452,7 +451,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_train,
-                    transform=transform_public_mnist,
+                    transform=transform_public_mnist if dataset_name == "mnist" else None,
                 )
             )
             partitions_train_private = (
@@ -462,7 +461,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_train,
-                    transform=transform_train,
+                    transform=transform_train if dataset_name == "mnist" else None,
                 )
             )
 
@@ -483,7 +482,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_test,
-                    transform=transform_public_mnist,
+                    transform=transform_public_mnist if dataset_name == "mnist" else None,
                     validation=True,
                 )
             )
@@ -495,7 +494,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_test,
-                    transform=transform_train,
+                    transform=transform_train if dataset_name == "mnist" else None,
                     validation=True,
                 )
             )
@@ -507,7 +506,7 @@ class FederatedDataset:
                 dataset_with_csv=dataset_with_csv,
                 dataset=train_ds,
                 image_path=image_path_train,
-                transform=transform_train,
+                transform=transform_train if dataset_name == "mnist" else None,
             )
             partitions_test = FederatedDataset.create_partitioned_dataset(
                 labels_per_cluster=labels_per_cluster_test,
@@ -515,7 +514,7 @@ class FederatedDataset:
                 dataset_with_csv=dataset_with_csv,
                 dataset=test_ds,
                 image_path=image_path_test,
-                transform=transform_train,
+                transform=transform_train if dataset_name == "mnist" else None,
             )
 
         # Now we can store the partitioned datasets
