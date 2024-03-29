@@ -29,7 +29,6 @@ run_sweep_and_agent "config_baseline_02"
 ulimit -n 4096
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_02.json
-
 run_sweep_and_agent "config_privacy_02"
 
 
@@ -37,7 +36,6 @@ run_sweep_and_agent "config_privacy_02"
 ulimit -n 4096
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.2.json
-
 run_sweep_and_agent "config_p2p_02"
 
 # list of sweeps to call

@@ -26,7 +26,7 @@
         "mixed_mode": false,
         "differential_privacy": false,
         "local_training_epochs": 2,
-        "fl_rounds": 10,
+        "fl_rounds": 20,
         "total_mixed_rounds": 0,
         "noise_multiplier": 0, 
         "lr": 0.06857897010624767,

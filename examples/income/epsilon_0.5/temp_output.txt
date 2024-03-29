@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_p2p_04.yaml
+wandb: Created sweep with ID: k4v7n8ak
+wandb: View sweep at: https://wandb.ai/lucacorbucci/income_p2p/sweeps/k4v7n8ak
+wandb: Run sweep agent with: wandb agent lucacorbucci/income_p2p/k4v7n8ak

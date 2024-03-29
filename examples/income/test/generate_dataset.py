@@ -8,9 +8,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from pistacchio_simulator.FederatedDataset.partition_dataset import FederatedDataset
 from pistacchio_simulator.FederatedDataset.Utils.custom_dataset import TabularDataset
 from pistacchio_simulator.FederatedDataset.Utils.preferences import Preferences
+from pistacchio_simulator.FederatedDataset.partition_dataset import FederatedDataset
 
 
 class ACSIncomeSplit:
@@ -138,6 +138,7 @@ for cluster in range(num_clusters):
     )
 
     # sample from a numpy array
+
     test_indexes = np.arange(len(dataframe))
     num_samples_test = int(len(dataframe) * test_size)
     sampled_indexes_test = np.random.choice(
@@ -147,6 +148,8 @@ for cluster in range(num_clusters):
     dataframe_test = dataframe[sampled_indexes_test]
     income_groups_test = income_groups[sampled_indexes_test]
     income_labels_test = income_labels[sampled_indexes_test]
+    test_dataset_size = len(dataframe_test)
+    all_indexes_test = np.arange(len(dataframe_test))
 
     cluster_test_data = TabularDataset(
         dataframe_test, income_groups_test, income_labels_test
@@ -252,9 +255,28 @@ for cluster in range(num_clusters):
             public_dataset,
             f"../data/income/federated_data/cluster_{cluster}_node_{client_id}_public_train.pt",
         )
+
         torch.save(
             public_dataset_validation,
             f"../data/income/federated_data/cluster_{cluster}_node_{client_id}_public_validation.pt",
+        )
+
+        # new
+        indexes_test = np.random.choice(
+            all_indexes_test, int(test_dataset_size / num_clients), replace=False
+        )
+        all_indexes_test = [
+            index for index in all_indexes_test if index not in indexes_test
+        ]
+        data_test = dataframe_test[indexes_test]
+        groups_test = income_groups_test[indexes_test]
+        labels_test = income_labels_test[indexes_test]
+
+        test_node_cluster = TabularDataset(data_test, groups_test, labels_test)
+
+        torch.save(
+            test_node_cluster,
+            f"../data/income/federated_data/test_node_{client_id}_cluster_{cluster}.pt",
         )
 
         tmp_public_private_indexes.append((public_indexes, private_indexes))
@@ -276,6 +298,3 @@ labels = np.concatenate(labels, axis=0)
 
 test_dataset = TabularDataset(data, groups, labels)
 torch.save(test_dataset, "../data/income/federated_data/server_test_set.pt")
-
-
-

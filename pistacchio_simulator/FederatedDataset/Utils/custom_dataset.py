@@ -59,6 +59,7 @@ class TabularDataset(Dataset):
         y (list): List of target values.
         """
         self.data = x
+        self.samples = x
         self.targets = y
         self.indexes = range(len(self.data))
         self.transform = transform

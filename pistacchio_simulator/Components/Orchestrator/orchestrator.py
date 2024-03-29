@@ -68,7 +68,7 @@ class Orchestrator:
         model: nn.Module,
     ) -> None:
 
-        seed_everything(42)
+        seed_everything(preferences.data_split_config.seed)
         self.preferences = preferences
         self.model = model
         self.federated_model = None

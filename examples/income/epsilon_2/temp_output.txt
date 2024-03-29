@@ -1,0 +1,21 @@
+wandb: Creating sweep from: config_baseline_02.yaml
+wandb: Created sweep with ID: na8nhqjb
+wandb: View sweep at: https://wandb.ai/lucacorbucci/income_p2p/sweeps/na8nhqjb
+wandb: Run sweep agent with: wandb agent lucacorbucci/income_p2p/na8nhqjb
+Exception ignored in atexit callback: <function _Manager._atexit_setup.<locals>.<lambda> at 0x7f413def0430>
+Traceback (most recent call last):
+  File "/home/l.corbucci/pistacchio-fl-simulator/.venv/lib/python3.10/site-packages/wandb/sdk/wandb_manager.py", line 166, in <lambda>
+    self._atexit_lambda = lambda: self._atexit_teardown()
+  File "/home/l.corbucci/pistacchio-fl-simulator/.venv/lib/python3.10/site-packages/wandb/sdk/wandb_manager.py", line 175, in _atexit_teardown
+    self._teardown(exit_code)
+  File "/home/l.corbucci/pistacchio-fl-simulator/.venv/lib/python3.10/site-packages/wandb/sdk/wandb_manager.py", line 186, in _teardown
+    result = self._service.join()
+  File "/home/l.corbucci/pistacchio-fl-simulator/.venv/lib/python3.10/site-packages/wandb/sdk/service/service.py", line 216, in join
+    ret = self._internal_proc.wait()
+  File "/usr/lib/python3.10/subprocess.py", line 1209, in wait
+    return self._wait(timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1959, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/usr/lib/python3.10/subprocess.py", line 1917, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt: 

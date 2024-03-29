@@ -1,0 +1,52 @@
+{
+    "dataset": "income",
+    "task_type": "fl",
+    "dataset_p2p": "public",
+    "dataset_server": "private",
+    "debug": true,
+    "save_model": false,
+    "wandb": true,
+    "public_private_experiment": true,
+    "pool_size": 20,
+    "data_split_config": {
+        "split_type_clusters": "non_iid",
+        "split_type_nodes": "non_iid_public_private_different_distribution",
+        "num_classes": 2,
+        "num_nodes": 5,
+        "num_clusters": 51,
+        "noniid_nodes_distribution": true,
+        "alpha": 5.0,
+        "server_test_set": "server_test_set.pt",
+        "store_path": "../data/income/federated_data",
+        "max_size": 0.2,
+        "validation_size": 0.2,
+        "seed": 42
+    },
+    "server_config": {
+        "differential_privacy": false,
+        "mixed_mode": false,
+        "local_training_epochs": 2,
+        "fl_rounds": 20,
+        "total_mixed_rounds": 0,
+        "noise_multiplier": 0,
+        "lr": 0.01
+    },
+    "hyperparameters_config": {
+        "batch_size": 72,
+        "max_phisical_batch_size": 128,
+        "delta": 1e-5,
+        "max_grad_norm": 1000000.0,
+        "weight_decay": 0,
+        "optimizer": "sgd"
+    },
+    "gpu_config": [
+        "cuda:2",
+        "cuda:1"
+    ],
+    "wandb_config": {
+        "tags": [],
+        "name": "Baseline",
+        "project_name": "income_p2p",
+        "sweep": true
+    }
+}

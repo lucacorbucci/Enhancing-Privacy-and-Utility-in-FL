@@ -24,7 +24,8 @@ node_modules/
 _book/
 # C extensions
 *.so
-
+*.csv
+*.png
 charmap.json.gz
 
 # Distribution / packaging
