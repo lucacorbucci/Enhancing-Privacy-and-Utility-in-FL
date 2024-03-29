@@ -95,54 +95,54 @@ rm -rf ./wandb/
 
 
 
-# list of sweeps to call
+# # list of sweeps to call
+# # ulimit -n 4096
+# # rm -rf ../data/mnist/federated_split
+# # poetry run python ./generate_dataset.py --config baseline_05.json
+
+# # run_sweep_and_agent "config_baseline_05"
+
+# # list of sweeps to call
 # ulimit -n 4096
 # rm -rf ../data/mnist/federated_split
-# poetry run python ./generate_dataset.py --config baseline_05.json
+# poetry run python ./generate_dataset.py --config private_05.json
 
-# run_sweep_and_agent "config_baseline_05"
+# run_sweep_and_agent "config_privacy_05"
+# rm -rf ./wandb/
 
-# list of sweeps to call
-ulimit -n 4096
-rm -rf ../data/mnist/federated_split
-poetry run python ./generate_dataset.py --config private_05.json
+# # list of sweeps to call
+# ulimit -n 4096
+# rm -rf ../data/mnist/federated_split
+# poetry run python ./generate_dataset.py --config p2p+server_0.5.json
 
-run_sweep_and_agent "config_privacy_05"
-rm -rf ./wandb/
+# run_sweep_and_agent "config_p2p_05"
+# rm -rf ./wandb/
 
-# list of sweeps to call
-ulimit -n 4096
-rm -rf ../data/mnist/federated_split
-poetry run python ./generate_dataset.py --config p2p+server_0.5.json
 
-run_sweep_and_agent "config_p2p_05"
-rm -rf ./wandb/
 
+# # # list of sweeps to call
+# # ulimit -n 4096
+# # rm -rf ../data/mnist/federated_split
+# # poetry run python ./generate_dataset.py --config baseline_06.json
+
+# # run_sweep_and_agent "config_baseline_06"
 
 
 # # list of sweeps to call
 # ulimit -n 4096
 # rm -rf ../data/mnist/federated_split
-# poetry run python ./generate_dataset.py --config baseline_06.json
+# poetry run python ./generate_dataset.py --config private_06.json
 
-# run_sweep_and_agent "config_baseline_06"
+# run_sweep_and_agent "config_privacy_06"
+# rm -rf ./wandb/
 
+# # list of sweeps to call
+# ulimit -n 4096
+# rm -rf ../data/mnist/federated_split
+# poetry run python ./generate_dataset.py --config p2p+server_0.6.json
 
-# list of sweeps to call
-ulimit -n 4096
-rm -rf ../data/mnist/federated_split
-poetry run python ./generate_dataset.py --config private_06.json
-
-run_sweep_and_agent "config_privacy_06"
-rm -rf ./wandb/
-
-# list of sweeps to call
-ulimit -n 4096
-rm -rf ../data/mnist/federated_split
-poetry run python ./generate_dataset.py --config p2p+server_0.6.json
-
-run_sweep_and_agent "config_p2p_06"
-rm -rf ./wandb/
+# run_sweep_and_agent "config_p2p_06"
+# rm -rf ./wandb/
 
 
 
