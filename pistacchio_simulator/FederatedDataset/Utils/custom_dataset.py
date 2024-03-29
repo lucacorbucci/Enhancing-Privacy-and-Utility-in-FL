@@ -247,11 +247,13 @@ class CelebaDataset(Dataset):
             to the images. Defaults to None.
         """
         dataframe = pd.read_csv(csv_path)
-
-        self.targets = dataframe["Target"].tolist()
-        self.classes = dataframe["Target"].tolist()
+        smiling_dict = {-1: 0, 1: 1}
+        targets = [smiling_dict[item] for item in dataframe["Smiling"].tolist()]
+        self.targets = targets
+        self.classes = targets
 
         self.samples = list(dataframe["image_id"])
+        self.data = list(dataframe["image_id"])
         self.n_samples = len(dataframe)
         self.transform = transform
         self.image_path = image_path

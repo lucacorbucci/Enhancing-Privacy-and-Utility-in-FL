@@ -8,7 +8,7 @@ class CelebaNet(nn.Module):
     def __init__(
         self,
         in_channels: int = 3,
-        num_classes: int = 4,
+        num_classes: int = 2,
         dropout_rate: float = 0,
     ) -> None:
         """Initializes the CelebaNet network.
