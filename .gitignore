@@ -26,6 +26,7 @@ _book/
 *.so
 *.csv
 *.png
+*.jpg
 charmap.json.gz
 
 # Distribution / packaging
