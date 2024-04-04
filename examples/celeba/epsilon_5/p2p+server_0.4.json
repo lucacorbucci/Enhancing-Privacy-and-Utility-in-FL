@@ -47,7 +47,7 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:2",
+        "cuda:0",
         "cuda:1"
     ],
     "wandb_config": {

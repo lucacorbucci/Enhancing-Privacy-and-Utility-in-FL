@@ -18,7 +18,7 @@ run_sweep_and_agent () {
 }
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config baseline_02.json
 
@@ -26,7 +26,7 @@ run_sweep_and_agent "config_baseline_02"
 
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config private_02.json
 
@@ -35,7 +35,7 @@ rm -rf ./wandb/
 
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.2.json
 
@@ -45,14 +45,14 @@ rm -rf ./wandb/
 
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config baseline_03.json
 
 run_sweep_and_agent "config_baseline_03"
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config private_03.json
 
@@ -60,7 +60,7 @@ run_sweep_and_agent "config_privacy_03"
 rm -rf ./wandb/
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.3.json
 
@@ -68,14 +68,14 @@ run_sweep_and_agent "config_p2p_03"
 rm -rf ./wandb/
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config baseline_04.json
 
 run_sweep_and_agent "config_baseline_04"
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config private_04.json
 
@@ -83,7 +83,7 @@ run_sweep_and_agent "config_privacy_04"
 rm -rf ./wandb/
 
 # list of sweeps to call
-
+# ulimit -n 4096
 rm -rf ../data/celeba/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.4.json
 

@@ -1,4 +1,4 @@
-wandb: Creating sweep from: config_p2p_06.yaml
-wandb: Created sweep with ID: v1z9c6oq
-wandb: View sweep at: https://wandb.ai/lucacorbucci/celeba_p2p_Sweeps/sweeps/v1z9c6oq
-wandb: Run sweep agent with: wandb agent lucacorbucci/celeba_p2p_Sweeps/v1z9c6oq
+wandb: Creating sweep from: config_p2p_04.yaml
+wandb: Created sweep with ID: fa2itimp
+wandb: View sweep at: https://wandb.ai/lucacorbucci/celeba_p2p_Sweeps/sweeps/fa2itimp
+wandb: Run sweep agent with: wandb agent lucacorbucci/celeba_p2p_Sweeps/fa2itimp
