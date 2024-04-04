@@ -19,7 +19,7 @@ run_sweep_and_agent () {
 
 
 # # list of sweeps to call
-# ulimit -n 4096
+# 
 # rm -rf ../data/mnist/federated_split
 # poetry run python ./generate_dataset.py --config only_p2p_0.2.json
 
@@ -30,7 +30,7 @@ run_sweep_and_agent () {
 # run_sweep_and_agent "config_server_p2p_0.2"
 
 # # list of sweeps to call
-# ulimit -n 4096
+# 
 # rm -rf ../data/mnist/federated_split
 # poetry run python ./generate_dataset.py --config only_p2p_0.2.json
 
@@ -43,7 +43,7 @@ run_sweep_and_agent () {
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config only_p2p_0.4.json
 
@@ -56,7 +56,7 @@ run_sweep_and_agent "config_server_p2p_0.4"
 
 
 # # list of sweeps to call
-# ulimit -n 4096
+# 
 # rm -rf ../data/mnist/federated_split
 # poetry run python ./generate_dataset.py --config only_p2p_0.6.json
 
@@ -69,7 +69,7 @@ run_sweep_and_agent "config_server_p2p_0.4"
 
 
 # # list of sweeps to call
-# ulimit -n 4096
+# 
 # rm -rf ../data/mnist/federated_split
 # poetry run python ./generate_dataset.py --config only_p2p_0.8.json
 
@@ -83,7 +83,7 @@ run_sweep_and_agent "config_server_p2p_0.4"
 
 
 # # # list of sweeps to call
-# # ulimit -n 4096
+# # 
 # # rm -rf ../data/mnist/federated_split
 # # poetry run python ./generate_dataset.py --config only_p2p_full.json
 

@@ -21,14 +21,14 @@ run_sweep_and_agent () {
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_02.json
 run_sweep_and_agent "config_privacy_02"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.2.json
 run_sweep_and_agent "config_p2p_02"
@@ -37,7 +37,7 @@ run_sweep_and_agent "config_p2p_02"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_03.json
 
@@ -45,7 +45,7 @@ run_sweep_and_agent "config_privacy_03"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.3.json
 
@@ -55,7 +55,7 @@ run_sweep_and_agent "config_p2p_03"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_04.json
 
@@ -63,7 +63,7 @@ run_sweep_and_agent "config_privacy_04"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.4.json
 
@@ -73,7 +73,7 @@ run_sweep_and_agent "config_p2p_04"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_05.json
 
@@ -81,7 +81,7 @@ run_sweep_and_agent "config_privacy_05"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.5.json
 
@@ -90,7 +90,7 @@ run_sweep_and_agent "config_p2p_05"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_06.json
 
@@ -98,7 +98,7 @@ run_sweep_and_agent "config_privacy_06"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.6.json
 

@@ -19,7 +19,7 @@ run_sweep_and_agent () {
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config baseline_02.json
 
@@ -38,7 +38,7 @@ run_sweep_and_agent "config_baseline_02"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_03.json
 
@@ -57,7 +57,7 @@ run_sweep_and_agent "config_baseline_03"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_04.json
 
@@ -76,7 +76,7 @@ run_sweep_and_agent "config_baseline_04"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_05.json
 
@@ -95,7 +95,7 @@ run_sweep_and_agent "config_baseline_05"
 
 
 # list of sweeps to call
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config private_06.json
 

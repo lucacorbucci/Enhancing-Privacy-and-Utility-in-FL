@@ -1,4 +1,4 @@
-wandb: Creating sweep from: config_p2p_06.yaml
-wandb: Created sweep with ID: vp0in0al
-wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/vp0in0al
-wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/vp0in0al
+wandb: Creating sweep from: config_privacy_05.yaml
+wandb: Created sweep with ID: lf2oeazy
+wandb: View sweep at: https://wandb.ai/lucacorbucci/mnist_Sweeps/sweeps/lf2oeazy
+wandb: Run sweep agent with: wandb agent lucacorbucci/mnist_Sweeps/lf2oeazy

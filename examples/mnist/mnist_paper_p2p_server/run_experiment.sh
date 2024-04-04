@@ -1,4 +1,4 @@
-ulimit -n 4096
+
 rm -rf ../data/mnist/federated_split
 poetry run python ./generate_dataset.py --config p2p+server_0.2.json
 
