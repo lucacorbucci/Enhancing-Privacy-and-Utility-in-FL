@@ -226,6 +226,7 @@ class DatasetDownloader:
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
             ],
         )
+        print("Downloading Celeba")
         train_dataset = CelebaDataset(
             csv_path="../data/celeba/train_original.csv",
             image_path="../data/celeba/img_align_celeba",

@@ -29,11 +29,12 @@ class CelebaNet(nn.Module):
         )
         self.cnn2 = nn.Conv2d(8, 16, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
         self.cnn3 = nn.Conv2d(16, 32, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
-        self.fc1 = nn.Linear(2048, num_classes)
+        self.fc1 = nn.Linear(2048, 2)
         self.gn_relu = nn.Sequential(
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
         )
+        # self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, input_data: Tensor) -> Tensor:
         """Defines the forward pass of the network.

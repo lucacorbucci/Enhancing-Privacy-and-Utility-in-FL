@@ -64,9 +64,21 @@ class FederatedDataset:
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
 
+        dataset_name = config.dataset if config else dataset_name
+
+        if train_ds is None and test_ds is None:
+            train_ds, test_ds = DatasetDownloader.download_dataset(
+                dataset_name=dataset_name,
+            )
+            print("transform - ", train_ds.transform)
+
         dataset_with_csv = False
         if hasattr(train_ds, "image_path"):
             dataset_with_csv = True
+            print("dataset with csv")
+        else:
+            print("not dataset with csv")
+            print(train_ds)
         split_type_clusters = (
             config.data_split_config.split_type_clusters
             if config
@@ -83,13 +95,9 @@ class FederatedDataset:
         num_clusters = config.data_split_config.num_clusters if config else num_clusters
         num_classes = config.data_split_config.num_classes if config else num_classes
         alpha = config.data_split_config.alpha if config else alpha
-        dataset_name = config.dataset if config else dataset_name
         store_path = config.data_split_config.store_path if config else store_path
 
-        if train_ds is None and test_ds is None:
-            train_ds, test_ds = DatasetDownloader.download_dataset(
-                dataset_name=dataset_name,
-            )
+        
         data = train_ds.data if hasattr(train_ds, "data") else train_ds.samples
         cluster_splits_train = []
         cluster_splits_test = []
@@ -206,7 +214,7 @@ class FederatedDataset:
                             image_ids=np.array(test_partition_cluster_test.samples)[indexes_node],
                             transform=test_partition_cluster_test.transform,
                             sensitive_features=np.array(test_partition_cluster_test.sensitive_features)[indexes_node]
-                            if hasattr(test_partition_cluster_test, "sensitive_features")
+                            if (hasattr(test_partition_cluster_test, "sensitive_features") and test_partition_cluster_test.sensitive_features is not None)
                             else None,
                         )
                     else:
@@ -364,6 +372,8 @@ class FederatedDataset:
         transform_train = train_ds.transform
         transform_test = train_ds.transform
 
+        print(transform_train)
+
         targets_train_per_class = FederatedDataset.create_targets_per_class(
             data=train_ds,
         )
@@ -451,7 +461,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_train,
-                    transform=transform_public_mnist if dataset_name == "mnist" else None,
+                    transform=transform_public_mnist if dataset_name == "mnist" else transform_train,
                 )
             )
             partitions_train_private = (
@@ -461,7 +471,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_train,
-                    transform=transform_train if dataset_name == "mnist" else None,
+                    transform=transform_train,
                 )
             )
 
@@ -482,7 +492,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_test,
-                    transform=transform_public_mnist if dataset_name == "mnist" else None,
+                    transform=transform_public_mnist if dataset_name == "mnist" else transform_train,
                     validation=True,
                 )
             )
@@ -494,7 +504,7 @@ class FederatedDataset:
                     dataset_with_csv=dataset_with_csv,
                     dataset=train_ds,
                     image_path=image_path_test,
-                    transform=transform_train if dataset_name == "mnist" else None,
+                    transform=transform_train,
                     validation=True,
                 )
             )
@@ -506,7 +516,7 @@ class FederatedDataset:
                 dataset_with_csv=dataset_with_csv,
                 dataset=train_ds,
                 image_path=image_path_train,
-                transform=transform_train if dataset_name == "mnist" else None,
+                transform=transform_train,
             )
             partitions_test = FederatedDataset.create_partitioned_dataset(
                 labels_per_cluster=labels_per_cluster_test,
@@ -514,7 +524,7 @@ class FederatedDataset:
                 dataset_with_csv=dataset_with_csv,
                 dataset=test_ds,
                 image_path=image_path_test,
-                transform=transform_train if dataset_name == "mnist" else None,
+                transform=transform_train,
             )
 
         # Now we can store the partitioned datasets

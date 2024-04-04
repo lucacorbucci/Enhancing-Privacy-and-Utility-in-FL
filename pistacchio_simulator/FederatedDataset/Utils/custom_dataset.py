@@ -111,6 +111,8 @@ class MyDataset(Dataset):
             _type_: sample we want to retrieve
         """
         img, target = self.data[idx], self.targets[idx]
+        print("Transform ok " if self.transform else "Transform NOK")
+
         if self.transform is not None:
             img = self.transform(img)
 
@@ -149,15 +151,32 @@ class MyDatasetWithCSV(Dataset):
             _type_: sample we want to retrieve
 
         """
-        img = Image.open(os.path.join(self.image_path, self.samples[index])).convert(
+        img = Image.open(
+            os.path.join(self.image_path, self.samples[index]),
+        ).convert(
             "RGB",
         )
+
         if self.transform:
             img = self.transform(img)
 
-        if isinstance(img, torch.Tensor):
-            return img, self.targets[index]
-        return transforms.functional.to_tensor(img), self.targets[index]
+        return (
+            img,
+            self.targets[index],
+        )
+        # img = Image.open(os.path.join(self.image_path, self.samples[index])).convert(
+        #     "RGB",
+        # )
+        # # if self.transform:
+        # #     img = self.transform(img)
+        # if self.transform:
+        #     img = self.transform(img)
+
+        # return img, self.targets[index]
+
+        # # if isinstance(img, torch.Tensor):
+        # #     return img, self.targets[index]
+        # # return transforms.functional.to_tensor(img), self.targets[index]
 
     def __len__(self) -> int:
         """This function returns the size of the dataset.
@@ -233,7 +252,7 @@ class CelebaDataset(Dataset):
         self,
         csv_path: str,
         image_path: str,
-        transform: torchvision.transforms = None,
+        transform: torchvision.transforms,
         debug: bool = True,
     ) -> None:
         """Initialization of the dataset.
@@ -253,18 +272,25 @@ class CelebaDataset(Dataset):
         self.classes = targets
 
         self.samples = list(dataframe["image_id"])
-        self.data = list(dataframe["image_id"])
+        # self.data = list(dataframe["image_id"])
+        
         self.n_samples = len(dataframe)
         self.transform = transform
         self.image_path = image_path
         self.debug = debug
-        if not self.debug:
-            self.images = [
-                Image.open(os.path.join(self.image_path, sample)).convert(
-                    "RGB",
-                )
-                for sample in self.samples
-            ]
+        # self.data = np.array([
+        #         Image.open(os.path.join(self.image_path, sample)).convert(
+        #             "RGB",
+        #         )
+        #         for sample in self.samples
+        #     ], dtype=object)
+        # if not self.debug:
+        #     self.images = [
+        #         Image.open(os.path.join(self.image_path, sample)).convert(
+        #             "RGB",
+        #         )
+        #         for sample in self.samples
+        #     ]
 
     def __getitem__(self, index: int):
         """Returns a sample from the dataset.
@@ -277,15 +303,16 @@ class CelebaDataset(Dataset):
             _type_: sample we want to retrieve
 
         """
-        if self.debug:
-            img = Image.open(
-                os.path.join(self.image_path, self.samples[index]),
-            ).convert(
-                "RGB",
-            )
-        else:
-            img = self.images[index]
+        # if self.debug:
+        #     img = Image.open(
+        #         os.path.join(self.image_path, self.samples[index]),
+        #     ).convert(
+        #         "RGB",
+        #     )
+        # else:
+        img = self.data[index]
 
+        print("Transform ok " if self.transform else "Transform NOK")
         if self.transform:
             img = self.transform(img)
 
