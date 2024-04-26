@@ -47,8 +47,8 @@
         "tags": [
             "dutch_04"
         ],
-        "name": "Baseline",
-        "project_name": "p2p_dutch_Sweeps",
+        "name": "Baseline_04",
+        "project_name": "paper_p2p_dutch",
         "sweep": true
     }
 }

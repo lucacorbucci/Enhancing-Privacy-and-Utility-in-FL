@@ -111,7 +111,6 @@ class MyDataset(Dataset):
             _type_: sample we want to retrieve
         """
         img, target = self.data[idx], self.targets[idx]
-        print("Transform ok " if self.transform else "Transform NOK")
 
         if self.transform is not None:
             img = self.transform(img)
@@ -312,7 +311,6 @@ class CelebaDataset(Dataset):
         # else:
         img = self.data[index]
 
-        print("Transform ok " if self.transform else "Transform NOK")
         if self.transform:
             img = self.transform(img)
 

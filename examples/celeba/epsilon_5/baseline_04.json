@@ -41,7 +41,7 @@
     },
     "gpu_config": [
         "cuda:0",
-        "cuda:1"
+        "cuda:0"
     ],
     "wandb_config": {
         "tags": [

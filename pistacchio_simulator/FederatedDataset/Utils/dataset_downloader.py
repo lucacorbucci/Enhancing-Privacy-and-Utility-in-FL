@@ -47,6 +47,8 @@ class DatasetDownloader:
             train_ds, test_ds = DatasetDownloader.download_adult()
         elif dataset_name == "dutch":
             train_ds, test_ds = DatasetDownloader.download_dutch()
+        elif dataset_name == "covertype":
+            train_ds, test_ds = DatasetDownloader.download_covertype()
         elif dataset_name == "celeba":
             train_ds, test_ds = DatasetDownloader.download_celeba()
         # elif dataset_name == "celeba_sensitive_feature":
@@ -418,6 +420,216 @@ class DatasetDownloader:
         )
 
         return train_dataset, test_dataset
+
+    @staticmethod
+    def download_covertype() -> (
+        Tuple[
+            torch.utils.data.DataLoader,
+            torch.utils.data.DataLoader,
+        ]
+    ):
+        """This function downloads the adult dataset.
+
+        Returns
+        -------
+            Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+            the train and test dataset
+        """
+        column_names = [
+            "Elevation",
+            "Aspect",
+            "Slope",
+            "Horizontal_Distance_To_Hydrology",
+            "Vertical_Distance_To_Hydrology",
+            "Horizontal_Distance_To_Roadways",
+            "Hillshade_9am",
+            "Hillshade_Noon",
+            "Hillshade_3pm",
+            "Horizontal_Distance_To_Fire_Points",
+            "Wilderness_Area_0",
+            "Wilderness_Area_1",
+            "Wilderness_Area_2",
+            "Wilderness_Area_3",
+            "Soil_Type_0",
+            "Soil_Type_1",
+            "Soil_Type_2",
+            "Soil_Type_3",
+            "Soil_Type_4",
+            "Soil_Type_5",
+            "Soil_Type_6",
+            "Soil_Type_7",
+            "Soil_Type_8",
+            "Soil_Type_9",
+            "Soil_Type_10",
+            "Soil_Type_11",
+            "Soil_Type_12",
+            "Soil_Type_13",
+            "Soil_Type_14",
+            "Soil_Type_15",
+            "Soil_Type_16",
+            "Soil_Type_17",
+            "Soil_Type_18",
+            "Soil_Type_19",
+            "Soil_Type_20",
+            "Soil_Type_21",
+            "Soil_Type_22",
+            "Soil_Type_23",
+            "Soil_Type_24",
+            "Soil_Type_25",
+            "Soil_Type_26",
+            "Soil_Type_27",
+            "Soil_Type_28",
+            "Soil_Type_29",
+            "Soil_Type_30",
+            "Soil_Type_31",
+            "Soil_Type_32",
+            "Soil_Type_33",
+            "Soil_Type_34",
+            "Soil_Type_35",
+            "Soil_Type_36",
+            "Soil_Type_37",
+            "Soil_Type_38",
+            "Soil_Type_39",
+            "Cover_type",
+        ]
+
+        data = pd.read_csv("../data/covertype/covtype.csv") #, names=column_names, header=None)
+        # dutch_df = pd.DataFrame(data[0]).astype("int32")
+
+        # dutch_df["sex_binary"] = np.where(dutch_df["sex"] == 1, 1, 0)
+        # dutch_df["occupation_binary"] = np.where(dutch_df["occupation"] >= 300, 1, 0)
+
+        # del dutch_df["sex"]
+        # del dutch_df["occupation"]
+
+        metadata_covtype = {
+            "name": "Covertype",
+            "target_variable": "Cover_type",
+            "protected_atts": ["Soil_Type_0"],
+            "protected_att_values": [0],
+            "protected_att_descriptions": ["Gender = Female"],
+            "protected_att_descriptions": [],
+        }
+
+        numpy_dataset = DatasetDownloader.dataset_to_numpy(
+            _df=data,
+            _feature_cols=column_names[:-1],
+            _metadata=metadata_covtype,
+            num_sensitive_features=1,
+        )
+
+        x = numpy_dataset[0]
+        y = numpy_dataset[2]
+        z = numpy_dataset[1]
+
+        xyz = list(zip(x, y, z))
+        random.shuffle(xyz)
+        x, y, z = zip(*xyz)
+        train_size = int(len(y) * 0.8)
+
+        x_train = np.array(x[:train_size])
+        x_test = np.array(x[train_size:])
+        y_train = np.array(y[:train_size])
+        y_test = np.array(y[train_size:])
+        z_train = np.array(z[:train_size])
+        z_test = np.array(z[train_size:])
+
+        train_dataset = TabularDataset(
+            x=np.hstack((x_train, np.ones((x_train.shape[0], 1)))).astype(
+                np.float32
+            ),
+            z=z_train.astype(np.float32),
+            y=y_train.astype(np.float32),
+        )
+
+        test_dataset = TabularDataset(
+            x=np.hstack((x_test, np.ones((x_test.shape[0], 1)))).astype(np.float32),
+            z=z_test.astype(np.float32),
+            y=y_test.astype(np.float32),
+        )
+
+        return train_dataset, test_dataset
+
+    # @staticmethod
+    # def download_covertype() -> (
+    #     Tuple[
+    #         torch.utils.data.DataLoader,
+    #         torch.utils.data.DataLoader,
+    #     ]
+    # ):
+    #     """This function downloads the adult dataset.
+
+    #     Returns
+    #     -------
+    #         Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    #         the train and test dataset
+    #     """
+    #     data = pd.read_fwf("../data/covertype/covtype.data")
+
+    #     covtype_df = pd.DataFrame(data[0]).astype("int32")
+
+    #     dutch_df["sex_binary"] = np.where(dutch_df["sex"] == 1, 1, 0)
+    #     dutch_df["occupation_binary"] = np.where(dutch_df["occupation"] >= 300, 1, 0)
+
+    #     del dutch_df["sex"]
+    #     del dutch_df["occupation"]
+
+    #     dutch_df_feature_columns = [
+    #         "age",
+    #         "household_position",
+    #         "household_size",
+    #         "prev_residence_place",
+    #         "citizenship",
+    #         "country_birth",
+    #         "edu_level",
+    #         "economic_status",
+    #         "cur_eco_activity",
+    #         "Marital_status",
+    #         "sex_binary",
+    #     ]
+
+    #     metadata_dutch = {
+    #         "name": "Dutch census",
+    #         "code": ["DU1"],
+    #         "protected_atts": ["sex_binary"],
+    #         "protected_att_values": [0],
+    #         "protected_att_descriptions": ["Gender = Female"],
+    #         "target_variable": "occupation_binary",
+    #     }
+
+    #     tmp = DatasetDownloader.dataset_to_numpy(dutch_df, dutch_df_feature_columns, metadata_dutch, num_sensitive_features=1)
+
+    #     x = tmp[0]
+    #     y = tmp[2]
+    #     z = tmp[1]
+
+    #     xyz = list(zip(x, y, z))
+    #     random.shuffle(xyz)
+    #     x, y, z = zip(*xyz)
+    #     train_size = int(len(y) * 0.8)
+
+    #     x_train = np.array(x[:train_size])
+    #     x_test = np.array(x[train_size:])
+    #     y_train = np.array(y[:train_size])
+    #     y_test = np.array(y[train_size:])
+    #     z_train = np.array(z[:train_size])
+    #     z_test = np.array(z[train_size:])
+
+    #     train_dataset = TabularDataset(
+    #         x=np.hstack((x_train, np.ones((x_train.shape[0], 1)))).astype(
+    #             np.float32
+    #         ),
+    #         z=z_train.astype(np.float32),
+    #         y=y_train.astype(np.float32),
+    #     )
+
+    #     test_dataset = TabularDataset(
+    #         x=np.hstack((x_test, np.ones((x_test.shape[0], 1)))).astype(np.float32),
+    #         z=z_test.astype(np.float32),
+    #         y=y_test.astype(np.float32),
+    #     )
+
+    #     return train_dataset, test_dataset
 
     @staticmethod
     def download_adult() -> (

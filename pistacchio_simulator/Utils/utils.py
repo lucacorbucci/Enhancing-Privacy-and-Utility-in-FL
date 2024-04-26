@@ -68,6 +68,8 @@ class Utils:
             model = FashionMnistNet()
         elif preferences.dataset == "dutch":
             model = LinearClassificationNet(input_size=11, output_size=2)
+        elif preferences.dataset == "covertype":
+            model = LinearClassificationNet(input_size=54, output_size=7)
         elif (
             preferences.dataset == "imaginette"
             or preferences.dataset == "imaginette_csv"
