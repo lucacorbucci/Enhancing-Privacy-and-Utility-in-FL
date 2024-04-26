@@ -150,7 +150,7 @@ def main() -> None:
         preferences.server_config.local_training_epochs = (
             args.local_training_epochs_server
         )
-    if args.seed:
+    if args.seed is not None:
         print("SETTING THE SEED")
         preferences.data_split_config.seed = args.seed
     if args.optimizer:
