@@ -45,8 +45,8 @@
     ],
     "wandb_config": {
         "tags": [],
-        "name": "Baseline",
-        "project_name": "p2p_covertype",
+        "name": "Baseline_02",
+        "project_name": "paper_p2p_covertype",
         "sweep": true
     }
 }
