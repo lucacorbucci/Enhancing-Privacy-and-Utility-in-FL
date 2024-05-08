@@ -54,7 +54,7 @@
         "tags": [
             "dutch_02"
         ],
-        "name": "P2P+Server",
+        "name": "p2p_public_02_epsilon_05",
         "project_name": "paper_p2p_dutch",
         "sweep": true
     }

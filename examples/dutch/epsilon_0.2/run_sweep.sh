@@ -18,6 +18,9 @@ run_sweep_and_agent () {
 }
 
 
+poetry run python ./generate_dataset.py --config private_02.json
+poetry run python ./generate_dataset.py --config private_03.json
+poetry run python ./generate_dataset.py --config private_04.json
 
 
 # list of sweeps to call

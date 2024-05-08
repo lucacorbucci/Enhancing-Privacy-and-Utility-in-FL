@@ -55,7 +55,7 @@
             "dutch_03"
         ],
         "name": "P2P+Server",
-        "project_name": "p2p_dutch_Sweeps",
+        "project_name": "paper_p2p_dutch",
         "sweep": true
     }
 }

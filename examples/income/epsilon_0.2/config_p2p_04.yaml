@@ -33,7 +33,7 @@ parameters:
   clipping:
     min: 1
     max: 10
-    
+
 command:
   - ${env}
   - poetry 

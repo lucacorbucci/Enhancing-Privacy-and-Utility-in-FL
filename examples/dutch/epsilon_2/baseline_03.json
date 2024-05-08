@@ -48,7 +48,7 @@
             "dutch_03"
         ],
         "name": "Baseline",
-        "project_name": "p2p_dutch_Sweeps",
+        "project_name": "paper_p2p_dutch",
         "sweep": true
     }
 }

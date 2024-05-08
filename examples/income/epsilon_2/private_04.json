@@ -17,7 +17,7 @@
         "noniid_nodes_distribution": true,
         "alpha": 5.0,
         "server_test_set": "server_test_set.pt",
-        "store_path": "../data/income/federated_data",
+        "store_path": "../data/income/federated_data_2",
         "max_size": 0.4,
         "validation_size": 0.2,
         "seed": 42
@@ -47,13 +47,13 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:2",
+        "cuda:0",
         "cuda:1"
     ],
     "wandb_config": {
         "tags": [],
-        "name": "Server",
-        "project_name": "income_p2p",
+        "name": "fl_public_04_epsilon_2",
+        "project_name": "paper_p2p_income",
         "sweep": true
     }
 }

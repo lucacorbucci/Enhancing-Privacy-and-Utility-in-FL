@@ -106,6 +106,13 @@ def main() -> None:
         metavar="N",
         help="Config file",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Config file",
+    )
     args = parser.parse_args()
     config = None
     try:
@@ -116,39 +123,39 @@ def main() -> None:
         sys.exit()
 
     preferences = parse_obj_as(Preferences, config)
-    if preferences.wandb_config.sweep:
-        if args.lr_p2p:
-            print("SETTING THE LEARNING RATE P2P")
-            preferences.p2p_config.lr = args.lr_p2p
-        if args.local_training_epochs_p2p:
-            print("SETTING THE NUMBER OF LOCAL STEPS P2P")
-            preferences.p2p_config.local_training_epochs = (
-                args.local_training_epochs_p2p
-            )
-        if args.fl_rounds_P2P:
-            print("SETTING THE NUMBER OF FL ROUNDS P2P")
-            preferences.p2p_config.fl_rounds = args.fl_rounds_P2P
-        if args.batch_size_p2p:
-            print("SETTING THE BATCH SIZE P2P")
-            preferences.p2p_config.batch_size = args.batch_size_p2p
+    if args.lr_p2p:
+        print("SETTING THE LEARNING RATE P2P")
+        preferences.p2p_config.lr = args.lr_p2p
+    if args.local_training_epochs_p2p:
+        print("SETTING THE NUMBER OF LOCAL STEPS P2P")
+        preferences.p2p_config.local_training_epochs = args.local_training_epochs_p2p
+    if args.fl_rounds_P2P:
+        print("SETTING THE NUMBER OF FL ROUNDS P2P")
+        preferences.p2p_config.fl_rounds = args.fl_rounds_P2P
+    if args.batch_size_p2p:
+        print("SETTING THE BATCH SIZE P2P")
+        preferences.p2p_config.batch_size = args.batch_size_p2p
 
-        if args.lr_server:
-            print("SETTING THE LEARNING RATE SERVER")
-            preferences.server_config.lr = args.lr_server
-        if args.batch_size_server:
-            print("SETTING THE BATCH SIZE")
-            preferences.server_config.batch_size = args.batch_size_server
-        if args.fl_rounds_server:
-            print("SETTING THE NUMBER OF FL ROUNDS SERVER")
-            preferences.server_config.fl_rounds = args.fl_rounds_server
-        if args.local_training_epochs_server:
-            print("SETTING THE NUMBER OF LOCAL STEPS SERVER")
-            preferences.server_config.local_training_epochs = (
-                args.local_training_epochs_server
-            )
-        if args.optimizer:
-            print("SETTING THE OPTIMIZER")
-            preferences.hyperparameters_config.optimizer = args.optimizer
+    if args.lr_server:
+        print("SETTING THE LEARNING RATE SERVER")
+        preferences.server_config.lr = args.lr_server
+    if args.batch_size_server:
+        print("SETTING THE BATCH SIZE")
+        preferences.server_config.batch_size = args.batch_size_server
+    if args.fl_rounds_server:
+        print("SETTING THE NUMBER OF FL ROUNDS SERVER")
+        preferences.server_config.fl_rounds = args.fl_rounds_server
+    if args.local_training_epochs_server:
+        print("SETTING THE NUMBER OF LOCAL STEPS SERVER")
+        preferences.server_config.local_training_epochs = (
+            args.local_training_epochs_server
+        )
+    if args.seed is not None:
+        print("SETTING THE SEED")
+        preferences.data_split_config.seed = args.seed
+    if args.optimizer:
+        print("SETTING THE OPTIMIZER")
+        preferences.hyperparameters_config.optimizer = args.optimizer
     if args.clipping:
         print("SETTING THE CLIPPING")
         preferences.hyperparameters_config.max_grad_norm = args.clipping

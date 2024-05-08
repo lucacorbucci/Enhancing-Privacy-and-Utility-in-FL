@@ -47,13 +47,13 @@
         "optimizer": "sgd"
     },
     "gpu_config": [
-        "cuda:2",
+        "cuda:0",
         "cuda:1"
     ],
     "wandb_config": {
         "tags": [],
-        "name": "Server",
-        "project_name": "income_p2p",
+        "name": "fl_public_02_epsilon_05",
+        "project_name": "paper_p2p_income",
         "sweep": true
     }
 }
