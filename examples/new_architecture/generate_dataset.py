@@ -1,8 +1,8 @@
 import argparse
 import json
 
-from pistacchio_simulator.DataSplit.generate_dataset import generate_splitted_dataset
-from pistacchio_simulator.Utils.preferences import Preferences
+from pistacchio_simulator.FederatedDataset.partition_dataset import FederatedDataset
+from pistacchio_simulator.FederatedDataset.Utils.preferences import Preferences
 
 
 def main() -> None:
@@ -23,9 +23,31 @@ def main() -> None:
     config = None
     with open(args.config, "r", encoding="utf-8") as file:
         config = json.load(file)
-    config = Preferences.generate_from_json(config)
+    config = Preferences(**config)
 
-    generate_splitted_dataset(config=config)
+    transform = transforms.Compose(
+        [
+            transforms.Resize((64, 64)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ],
+    )
+    train_dataset = CelebaDataset(
+        csv_path="../data/celeba/train_smiling.csv",
+        image_path="../data/celeba/img_align_celeba",
+        transform=transform,
+        debug=True,
+    )
+    test_dataset = CelebaDataset(
+        csv_path="../data/celeba/test_smiling.csv",
+        image_path="../data/celeba/img_align_celeba",
+        transform=transform,
+        debug=True,
+    )
+
+    FederatedDataset.generate_partitioned_dataset(
+        config=config, train_ds=train_dataset, test_ds=test_dataset
+    )
 
 
 if __name__ == "__main__":

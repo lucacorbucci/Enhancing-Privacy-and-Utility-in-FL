@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_privacy_06.yaml
+wandb: Created sweep with ID: cy5s87fy
+wandb: View sweep at: https://wandb.ai/lucacorbucci/p2p_dutch_Sweeps/sweeps/cy5s87fy
+wandb: Run sweep agent with: wandb agent lucacorbucci/p2p_dutch_Sweeps/cy5s87fy

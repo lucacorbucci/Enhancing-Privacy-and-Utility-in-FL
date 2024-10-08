@@ -445,7 +445,9 @@ class TestDataSplit:
         assert max_samples_per_cluster == splits
 
     @staticmethod
-    def test_create_splits_when_max_samples_per_cluster_is_a_list_should_raise_an_exception() -> None:
+    def test_create_splits_when_max_samples_per_cluster_is_a_list_should_raise_an_exception() -> (
+        None
+    ):
         """Test the create_splits function when max_samples_per_cluster is a list."""
         mock_dataset = MyDataset(
             samples=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] * 100,
@@ -458,7 +460,9 @@ class TestDataSplit:
             DataSplit.create_splits(mock_dataset, num_workers, max_samples_per_cluster)
 
     @staticmethod
-    def test_create_splits_when_max_samples_per_cluster_is_a_list_should_raise_an_exception_few_elements() -> None:
+    def test_create_splits_when_max_samples_per_cluster_is_a_list_should_raise_an_exception_few_elements() -> (
+        None
+    ):
         """Test the create_splits function when max_samples_per_cluster is a list."""
         mock_dataset = MyDataset(
             samples=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] * 100,
@@ -21466,7 +21470,9 @@ class TestDataSplit:
         assert counter == len(mock_dataset)
 
     @staticmethod
-    def test_sum_of_splitted_dataset_by_percentage_is_equal_to_original_dataset() -> None:
+    def test_sum_of_splitted_dataset_by_percentage_is_equal_to_original_dataset() -> (
+        None
+    ):
         """This function is used to test the write percentage split."""
         percentage_configuration = {
             "cluster_0": {0: 60, 1: 30, 2: 20, 3: 20},
@@ -21522,7 +21528,6 @@ class TestDataSplit:
         )
         counter = 0
         for _, name in enumerate(names):
-
             with open(
                 f"../data/MNIST/federated_split/train_set/{name}_split", "rb"
             ) as file:
@@ -21564,7 +21569,9 @@ class TestDataSplit:
         assert sum(class_distribution) == 30
 
     @staticmethod
-    def test_generate_nodes_distribution_generates_a_non_empty_class_assigment() -> None:
+    def test_generate_nodes_distribution_generates_a_non_empty_class_assigment() -> (
+        None
+    ):
         """This test is used to check if each node has at least one class assigned."""
         names = [
             "0_cluster_0",

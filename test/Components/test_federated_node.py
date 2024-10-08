@@ -7,7 +7,6 @@ import pytest
 import torch
 from torch import nn
 
-
 sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 from pistacchio_simulator.Components.FederatedNode.federated_node import FederatedNode
 from pistacchio_simulator.DataSplit.custom_dataset import MyDataset
@@ -16,7 +15,6 @@ from pistacchio_simulator.DataSplit.storage_manager import StorageManager
 from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
 from pistacchio_simulator.Utils.preferences import Preferences
 from pistacchio_simulator.Utils.task import Task
-
 
 preferences = Preferences(
     dataset_name="mnist",
@@ -29,7 +27,7 @@ preferences = Preferences(
         "num_nodes": 5,
         "num_clusters": 1,
         "split_type": "percentage",
-        "server_validation_set": "server_validation_split",
+        "server_test_set": "server_validation_split",
     },
     p2p_config={
         "local_training_epochs": 1,

@@ -1,8 +1,6 @@
-import multiprocessing
 from typing import Any
 
-
-# from multiprocess import Manager, Queue
+import multiprocess
 
 
 class CommunicationChannel:
@@ -10,8 +8,8 @@ class CommunicationChannel:
 
     def __init__(self, name: str = "admin") -> None:
         self.name: str = name
-        multiprocessing_manager = multiprocessing.Manager()
-        self.channel: Queue = multiprocessing_manager.Queue()
+        multiprocess_manager = multiprocess.Manager()
+        self.channel: Queue = multiprocess_manager.Queue()
 
     def receive_data(self) -> Any:
         """This function is used to receive data from a queue.

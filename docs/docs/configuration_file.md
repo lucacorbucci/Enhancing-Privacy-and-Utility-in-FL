@@ -26,7 +26,7 @@ The configuration file is a JSON file that contains all the parameters needed to
 		"num_nodes": 3,
 		"num_clusters": 3,
 		"noniid_nodes_distribution": false,
-		"server_validation_set": "server_validation_split",
+		"server_test_set": "server_validation_split",
 		"percentage_configuration": {
 			"cluster_0": {
 				"0": 80,
@@ -100,7 +100,7 @@ With the **data_split_config** parameter we can specify all the parameters relat
 -   **num_nodes:** The number of nodes we want to use in the test.
 -   **num_clusters:** The number of clusters we want to use in the test.
 -   **noniid_nodes_distribution:** if true, the data split will be non-iid for each node. Otherwise it will be iid for each node inside each cluster.
--   **server_validation_set:** the dataset we want to use as validation set on the server. The default value is "server_validation_split". We assume that the server has some data to make a test at each iteration.
+-   **server_test_set:** the dataset we want to use as validation set on the server. The default value is "server_validation_split". We assume that the server has some data to make a test at each iteration.
 -   **percentage_configuration:** A dictionary with the percentage of data that we want to assign to each cluster. The keys of the dictionary are the cluster names. The values are dictionaries with the percentage of data for each class. The keys of the inner dictionary are the class names and the values are the percentage of data for that class.
 
 With the **p2p_config** parameter we can specify all the parameters related to the P2P training:

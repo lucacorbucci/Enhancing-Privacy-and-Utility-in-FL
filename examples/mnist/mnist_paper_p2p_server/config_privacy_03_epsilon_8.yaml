@@ -1,0 +1,33 @@
+program: run_test.py
+method: bayes
+metric:
+  name: Custom_Metric
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 5
+parameters:
+  optimizer:
+    values: ["adam", "sgd"]
+  lr_server:
+    min: 0.0001
+    max: 0.1
+  batch_size_server:
+    min: 32
+    max: 256
+  local_training_epochs_server:
+    min: 1
+    max: 4
+  clipping:
+    min: 1
+    max: 20
+
+command:
+  - ${env}
+  - poetry 
+  - run 
+  - python
+  - ${program}
+  - --config 
+  - private_03_epsilon_8.json
+  - ${args}

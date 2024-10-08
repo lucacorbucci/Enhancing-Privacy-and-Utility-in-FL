@@ -24,7 +24,9 @@ node_modules/
 _book/
 # C extensions
 *.so
-
+*.csv
+*.png
+*.jpg
 charmap.json.gz
 
 # Distribution / packaging
@@ -95,3 +97,4 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 *.pyc
+*.pkl

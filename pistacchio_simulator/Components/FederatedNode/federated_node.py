@@ -1,19 +1,23 @@
+import gc
+import os
 import sys
-import time
-from typing import Any, Mapping, TypeVar
+from pathlib import Path
+from typing import Mapping, TypeVar
 
+import dill
+import numpy as np
+import torch
 from loguru import logger
+from opacus import PrivacyEngine
+from opacus.utils.batch_memory_manager import BatchMemoryManager
 from torch import Tensor, nn
 
-from pistacchio_simulator.Exceptions.errors import NotYetInitializedServerChannelError
-from pistacchio_simulator.Models.federated_model import FederatedModel
-from pistacchio_simulator.Utils.communication_channel import CommunicationChannel
-from pistacchio_simulator.Utils.end_messages import Message
+from pistacchio_simulator.Utils.data_loader import DataLoader
+from pistacchio_simulator.Utils.learning import Learning
 from pistacchio_simulator.Utils.performances import Performances
 from pistacchio_simulator.Utils.phases import Phase
 from pistacchio_simulator.Utils.preferences import Preferences
-from pistacchio_simulator.Utils.weights import Weights
-
+from pistacchio_simulator.Utils.utils import Utils
 
 logger.remove()
 logger.add(
@@ -23,6 +27,53 @@ logger.add(
 )
 
 TDestination = TypeVar("TDestination ", bound=Mapping[str, Tensor])
+node_name_lenght = 16
+
+
+def accuracy(preds, labels):
+    return (preds == labels).mean()
+
+
+def train(model, train_loader, optimizer, epoch, device, privacy_engine):
+    model.train()
+
+    criterion = nn.CrossEntropyLoss()
+
+    DELTA = 1e-5
+    losses = []
+    top1_acc = []
+
+    with BatchMemoryManager(
+        data_loader=train_loader,
+        max_physical_batch_size=128,
+        optimizer=optimizer,
+    ) as memory_safe_data_loader:
+        for _, (images, target) in enumerate(memory_safe_data_loader):
+            optimizer.zero_grad()
+
+            images = images.to(device)
+            target = target.long()
+            target = target.to(device)
+
+            # compute output
+            output = model(images)
+            loss = criterion(output, target)
+
+            loss.backward()
+
+            optimizer.step()
+
+            preds = np.argmax(output.detach().cpu().numpy(), axis=1)
+            labels = target.detach().cpu().numpy()
+
+            # measure accuracy and record loss
+            acc = accuracy(preds, labels)
+
+            losses.append(loss.item())
+            top1_acc.append(acc)
+
+        epsilon = privacy_engine.get_epsilon(DELTA)
+        return np.mean(losses), np.mean(top1_acc), epsilon
 
 
 class FederatedNode:
@@ -34,10 +85,11 @@ class FederatedNode:
     def __init__(
         self,
         node_id: str,
+        cluster_id: str,
+        node_name: str,
         preferences: Preferences,
-        # server_channel: CommunicationChannel,
-        # logging_queue: CommunicationChannel,
-        # receiver_channel: CommunicationChannel | None = None,
+        phase: Phase,
+        weights,
     ) -> None:
         """Init the Federated Node.
 
@@ -48,149 +100,128 @@ class FederatedNode:
             # logging_queue (CommunicationChannel): queue that is used to send back the
             #     performances of the node to the main thread.
         """
+
         self.node_id = node_id
-        # self.logging_queue = logging_queue
+        self.cluster_id = cluster_id
         self.preferences = preferences
+        self.phase = phase
         self.mode = "federated"
-        # self.receiver_channel = (
-        #     receiver_channel if receiver_channel else CommunicationChannel(name=node_id)
-        # )
         self.mixed = False
         self.message_counter = 0
-        # self.server_channel: CommunicationChannel | None = None
-        self.federated_model = None
-
-    # def receive_data_from_server(self) -> Any:
-    #     """This function receives the weights from the server.
-    #     If the weights are not received, it returns an error message
-    #     otherwise it returns the weights.
-
-    #     Returns
-    #     -------
-    #         Union[Weights, None]: Weights received from the server
-    #     """
-    #     try:
-    #         received_data = self.receiver_channel.receive_data()
-    #         return (
-    #             received_data
-    #             if received_data == Message.STOP
-    #             else received_data.weights
-    #         )
-    #     except (ValueError, AttributeError):
-    #         return Message.ERROR
-
-    def send_weights_to_server(self, weights: Weights) -> None:
-        """This function is used to send the weights of the nodes to the server.
-
-        Args:
-            weights (Weights): weights to be sent to the server
-        Raises:
-            ValueError: Raised when the server channel is not initialized
-        """
-        if self.server_channel:
-            self.server_channel.send_data(weights)
+        self.node_name = node_name
+        self.node_folder_path = f"{self.preferences.data_split_config.store_path}/nodes_data/{self.node_name}/"
+        self.load_data()
+        gpus = preferences.gpu_config
+        if gpus:
+            gpu_name = gpus[int(self.node_id) % len(gpus)]
+            self.device = torch.device(
+                gpu_name if torch.cuda.is_available() and gpus else "cpu",
+            )
         else:
-            raise ValueError("Server channel not initialized")
+            self.device = "cpu"
+        self.dp = False
+        self.weights = weights
+        accountant = self.load_accountant()
+        self.privacy_engine = PrivacyEngine(accountant="rdp")
+        if accountant:
+            logger.info(f"Loading the accountant on {self.node_name}")
+            self.privacy_engine.accountant = accountant
 
-    def add_server_channel(self, server_channel: CommunicationChannel) -> None:
-        """This function adds the server channel to the sender thread.
+        logger.info(f"Node {self.node_name} is using device {self.device}")
 
-        Args:
-            server_channel (_type_): server channel
-        """
-        self.server_channel = server_channel
+    def load_data(self):
+        self.validation_set = None
+        self.validation_loader = None
+        if self.preferences.public_private_experiment and self.phase == Phase.P2P:
+            if self.preferences.dataset_p2p:
+                # When I have the P2P phase and during that phase I don't use differential privacy
+                # then I have to use the public dataset. Instead, when I use DP, I'll use the
+                # private training dataset even during the P2P phase
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_train.pt",
+                )
+            else:
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_public_train.pt",
+                )
+        elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
+            if self.preferences.dataset_server:
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_train.pt",
+                )
+            else:
+                self.train_set = DataLoader().load_splitted_dataset(
+                    f"{self.preferences.data_split_config.store_path}/{self.node_name}_private_train.pt",
+                )
+        else:
+            self.train_set = DataLoader().load_splitted_dataset(
+                f"{self.preferences.data_split_config.store_path}/{self.node_name}_train.pt",
+            )
+        from collections import Counter
 
-    def init_federated_model(self, model: nn.Module) -> FederatedModel:
-        """Initialize the federated learning model.
-
-        Args:
-            model (_type_): _description_
-
-        Returns
-        -------
-            FederatedModel: _description_
-        """
-        federated_model: FederatedModel = FederatedModel(
-            dataset_name=self.preferences.dataset_name,
-            node_name=self.node_id,
-            preferences=self.preferences,
+        print(
+            f"NODE NAME {self.node_name} has {Counter([target.item() for target in self.train_set.targets])}"
         )
-        federated_model.init_model(net=model)
-
-        return federated_model
-
- 
-
-    def local_training(
-        self,
-        differential_private_train: bool,
-    ) -> dict:
-        """_summary_.
-
-        Args:
-            differential_private_train (bool): _description_
-            federated_model (FederatedModel): _description_
-
-        Returns
-        -------
-            dict: _description_
-        """
-        epsilon = None
-        if differential_private_train:
-            (
-                loss,
-                accuracy,
-                epsilon,
-            ) = self.federated_model.train_with_differential_privacy()
+        # self.test_set = DataLoader().load_splitted_dataset(
+        #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_test.pt",
+        # )
+        if self.phase == Phase.P2P:
+            batch_size = self.preferences.p2p_config.batch_size
         else:
-            loss, accuracy = self.federated_model.train()
-        return {"loss": loss, "accuracy": accuracy, "epsilon": epsilon}
+            batch_size = self.preferences.server_config.batch_size
+        print(f"Batch size {batch_size}")
+        
+        if self.preferences.data_split_config.validation_size > 0:
+            if self.preferences.public_private_experiment and self.phase == Phase.P2P:
+                if self.preferences.dataset_p2p:
+                    # self.train_set = DataLoader().load_splitted_dataset(
+                    #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_train.pt",
+                    # )
+                    self.validation_set = DataLoader().load_splitted_dataset(
+                        f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_p2p}_validation.pt",
+                    )
+            elif self.preferences.public_private_experiment and self.phase == Phase.SERVER:
+                if self.preferences.dataset_server:
+                    # self.train_set = DataLoader().load_splitted_dataset(
+                    #     f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_train.pt",
+                    # )
+                    self.validation_set = DataLoader().load_splitted_dataset(
+                        f"{self.preferences.data_split_config.store_path}/{self.node_name}_{self.preferences.dataset_server}_validation.pt",
+                    )
+           
+            
+            self.validation_loader = torch.utils.data.DataLoader(
+                self.validation_set,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=0,
+            )
 
-    def send_and_receive_weights_with_server(
-        self,
-        federated_model: FederatedModel,
-        metrics: dict,
-        results: dict | None = None,
-    ) -> Any:
-        """Send weights to the server and receive the
-        updated weights from the server.
-
-        Args:
-            federated_model (FederatedModel): Federated model
-            metrics (dict): metrics computed on the node (loss, accuracy, epsilon)
-
-        Returns
-        -------
-            _type_: weights received from the server
-        """
-        # Create the Weights object that we will send to the server
-        weights = Weights(
-            weights=federated_model.get_weights(),
-            sender=self.node_id,
-            epsilon=metrics["epsilon"],
-            results=results,
+        self.train_loader = torch.utils.data.DataLoader(
+            self.train_set,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
         )
-        # Send weights to the server
-        self.send_weights_to_server(weights)
-        self.message_counter += 1
-        # Receive the updated weights from the server
-        received_weights: Weights | Message = self.receive_data_from_server()
-        self.message_counter += 1
 
-        return received_weights
+        print("train ", len(self.train_loader.dataset))
+        print("test ", len(self.validation_loader.dataset))
 
-    
-    def send_performances(self, performances: dict[str, Performances]) -> None:
-        """This function is used to send the performances of
-        the node to the server.
 
-        Args:
-            performances (Performances): _description_
-        """
-        if self.server_channel:
-            self.server_channel.send_data(performances)
-        else:
-            raise NotYetInitializedServerChannelError
+     
+
+    def load_accountant(self):
+        accountant = None
+        # If we already used this client we need to load the state regarding
+        # the private model
+        if os.path.exists(f"{self.node_folder_path}privacy_engine.pkl"):
+            with open(f"{self.node_folder_path}privacy_engine.pkl", "rb") as file:
+                accountant = dill.load(file)
+                logger.info(
+                    f"Node {self.node_name} loaded privacy engine during {self.phase} phase"
+                )
+
+        return accountant
 
     def compute_performances(
         self,
@@ -200,25 +231,9 @@ class FederatedNode:
         message_counter: int,
         epsilon_list: list | None,
     ) -> dict:
-        """This function is used to compute the performances
-        of the node. In particulare we conside the list of
-        loss, accuracy and epsilon computed during the
-        local training on the node.
-
-        Args:
-            loss_list (List): list of loss computed during the local training
-            accuracy_list (List): list of accuracy computed during the local training
-            phase (str): Phase of the training (P2P or server)
-            message_counter (int): count of the exchanged messages
-            epsilon_list (List, optional): list of epsilon computed
-                during the local training. Defaults to None.
-
-        Returns
-            Performances: Performance object of the node
-        """
         epochs = range(
             1,
-            self.preferences.server_config["num_communication_round_with_server"] + 1,
+            self.preferences.server_config.fl_rounds + 1,
         )
 
         performances = {}
@@ -235,98 +250,158 @@ class FederatedNode:
 
         return performances
 
-    def receive_starting_model_from_server(
-        self,
-        federated_model: FederatedModel,
-    ) -> None:
-        """This function is used to receive the starting model
-        from the server so that all the nodes start the federated training
-        from the same random weights.
-
-        Args:
-            federated_model (FederatedModel): The federated model we want
-            to initialize with the received weights
-        """
-        received_weights = self.receive_data_from_server()
-        federated_model.update_weights(received_weights)
-
-    def start_node(self, model: nn.Module) -> None:
-        """This method implements all the logic of the federated node.
-        It starts the training of the model and then sends the weights to the
-        server.
-        Then, after the end of the training, it sends the performances of the
-        node to the main thread.
-
-        Args:
-            model (_type_): Model that we want to use during the federated learning
-        """
-        logger.debug(f"Starting node {self.node_id}")
-        self.federated_model = self.init_federated_model(model)
-        # self.receive_starting_model_from_server(federated_model=federated_model)
-        # logger.debug(f"Node {self.node_id} received starting model from server")
-
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
-
-        # Initialize differential privacy if needed
-        # if differential_private_train:
-        #     self.federated_model.init_differential_privacy(phase=Phase.SERVER, node_id=self.node_id)
-        #     logger.debug(f"Node {self.node_id} initialized differential privacy")
-        logger.debug(f"Node {self.node_id} started")
-
-     
     def train_local_model(
         self,
+        phase: Phase,
         # results: dict | None = None,
     ) -> tuple[list[float], list[float], list[float]]:
-        """This function starts the server phase of the federated learning.
-        In particular, it trains the model locally and then sends the weights.
-        Then the updated weights are received and used to update
-        the local model.
+        model = Utils.get_model(preferences=self.preferences)
+        model.to(self.device)
+        Utils.set_params(model, self.weights)
 
-        Args:
-            federated_model (FederatedModel): _description_
-
-        Returns
-        -------
-            Tuple[List[float], List[float], List[float]]: _description_
-        """
-        logger.debug(f"Starting training on node {self.node_id}")
-        loss_list: list[float] = []
-        accuracy_list: list[float] = []
-        epsilon_list: list[float] = []
-
-        local_epochs = self.preferences.server_config[
-            "local_training_epochs_with_server"
-        ]
-        differential_private_train = self.preferences.server_config[
-            "differential_privacy_server"
-        ]
-
-        for _ in range(local_epochs):
-            metrics = self.local_training(
-                differential_private_train,
-            )
-            loss_list.append(metrics["loss"])
-            accuracy_list.append(metrics["accuracy"])
-            if metrics.get("epsilon", None):
-                epsilon_list.append(metrics["epsilon"])
-        
-        logger.debug("2")
-        return Weights(
-            weights=self.federated_model.get_weights(),
-            sender=self.node_id,
-            epsilon=metrics["epsilon"],
+        optimizer = Utils.get_optimizer(
+            preferences=self.preferences, model=model, phase=phase
         )
 
-        # received_weights = self.send_and_receive_weights_with_server(
-        #     federated_model=federated_model,
-        #     metrics=metrics,
-        #     results=results,
-        # )
+        # model = model.to(self.device)
 
-        # Update the weights of the model
-        # federated_model.update_weights(received_weights)
+        (
+            private_model,
+            private_optimizer,
+            private_train_loader,
+        ) = self.init_differential_privacy(
+            phase=phase,
+            optimizer=optimizer,
+            model=model,
+        )
+        private_model.to(self.device)
+        print("TO DEVICE", self.device)
 
-        # return loss_list, accuracy_list, epsilon_list,
+        local_epochs = (
+            self.preferences.server_config.local_training_epochs
+            if phase == Phase.SERVER
+            else self.preferences.p2p_config.local_training_epochs
+        )
+
+        for local_epoch in range(local_epochs):
+            train_loss, accuracy, epsilon = train(
+                model=private_model,
+                train_loader=private_train_loader,
+                optimizer=private_optimizer,
+                epoch=local_epoch,
+                device=self.device,
+                privacy_engine=self.privacy_engine,
+            )
+            metrics = {"loss": train_loss, "accuracy": accuracy, "epsilon": epsilon}
+
+        # Evaluate the model on validation set
+        if self.validation_loader is not None:
+            (
+                validation_loss,
+                validation_accuracy,
+                _,
+                _,
+                _,
+            ) = Learning.evaluate_model(
+                model=private_model,
+                test_loader=self.validation_loader,
+                device=self.device,
+            )
+
+        # Evaluate the model on test set
+        # if self.test_set:
+        #     (
+        #         test_loss,
+        #         test_accuracy,
+        #         _,
+        #         _,
+        #         _,
+        #     ) = Learning.evaluate_model(
+        #         model=private_model,
+        #         test_loader=self.test_loader,
+        #         device=self.device,
+        #     )
+
+        metrics["validation_loss"] = torch.tensor(validation_loss)
+        # metrics["test_loss"] = torch.tensor(test_loss)
+        metrics["validation_accuracy"] = torch.tensor(validation_accuracy)
+        # metrics["test_accuracy"] = torch.tensor(test_accuracy)
+
+        # We need to store the state of the privacy engine and all the
+        # details about the private training
+        directory_path = Path(self.node_folder_path)
+        directory_path.mkdir(parents=True, exist_ok=True)
+
+        if self.noise_multiplier != 0:
+            with open(f"{self.node_folder_path}privacy_engine.pkl", "wb") as f:
+                dill.dump(self.privacy_engine.accountant, f)
+
+        Utils.set_params(model, Utils.get_parameters(private_model))
+        gc.collect()
+
+        return (
+            Utils.get_parameters(model),
+            metrics,
+            len(self.train_loader.dataset),
+        )
+
+    def init_differential_privacy(self, phase: Phase, optimizer, model):
+        logger.info(f"Initializing differential privacy for Phase {phase}")
+
+        epsilon = None
+        noise_multiplier = 0
+        clipping = (
+            self.preferences.hyperparameters_config.max_grad_norm
+            if self.preferences.hyperparameters_config.max_grad_norm
+            else 100000000
+        )
+        if (
+            phase == Phase.P2P
+            and self.preferences.p2p_config
+            and self.preferences.p2p_config.differential_privacy
+        ):
+            epsilon = self.preferences.p2p_config.epsilon
+            noise_multiplier = self.preferences.p2p_config.noise_multiplier
+        elif (
+            phase == Phase.SERVER
+            and self.preferences.server_config
+            and self.preferences.server_config.differential_privacy
+        ):
+            epsilon = self.preferences.server_config.epsilon
+            noise_multiplier = self.preferences.server_config.noise_multiplier
+
+        if epsilon:
+            logger.info(f"Initializing differential privacy with epsilon {epsilon}")
+            # (
+            #     self.net,
+            #     optimizer,
+            #     train_loader,
+            # ) = self.privacy_engine.make_private_with_epsilon(
+            #     module=self.net,
+            #     optimizer=self.optimizer,
+            #     data_loader=self.train_loader,
+            #     epochs=epochs,
+            #     target_epsilon=epsilon,
+            #     target_delta=delta,
+            #     max_grad_norm=clipping,
+            # )
+        else:
+            self.noise_multiplier = noise_multiplier
+            if self.noise_multiplier == 0:
+                clipping = 100000000
+            logger.info(
+                f"Initializing differential privacy with noise {noise_multiplier} and clipping {clipping}"
+            )
+
+            (
+                private_model,
+                private_optimizer,
+                private_train_loader,
+            ) = self.privacy_engine.make_private(
+                module=model,
+                optimizer=optimizer,
+                data_loader=self.train_loader,
+                noise_multiplier=noise_multiplier,
+                max_grad_norm=clipping,
+            )
+        return private_model, private_optimizer, private_train_loader

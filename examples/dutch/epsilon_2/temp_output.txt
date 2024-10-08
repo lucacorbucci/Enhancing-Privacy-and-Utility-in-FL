@@ -1,0 +1,4 @@
+wandb: Creating sweep from: config_p2p_06.yaml
+wandb: Created sweep with ID: gutmppav
+wandb: View sweep at: https://wandb.ai/lucacorbucci/p2p_dutch_Sweeps/sweeps/gutmppav
+wandb: Run sweep agent with: wandb agent lucacorbucci/p2p_dutch_Sweeps/gutmppav

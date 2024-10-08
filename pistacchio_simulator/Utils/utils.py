@@ -2,22 +2,130 @@ import os
 import random
 import time
 from collections import OrderedDict
+from functools import reduce
+from io import BytesIO
 from types import ModuleType
 from typing import Any, Mapping, TypeVar
 
+import numpy as np
 import torch
-from dotenv import load_dotenv
-from torch import Tensor
-
 import wandb
-from pistacchio_simulator.Utils.preferences import Preferences
+from dotenv import load_dotenv
+from torch import Tensor, nn
+from torchvision import models
 
+from pistacchio_simulator.Exceptions.errors import InvalidDatasetNameError
+from pistacchio_simulator.Models.celeba import CelebaNet
+from pistacchio_simulator.Models.fashion_mnist import FashionMnistNet
+from pistacchio_simulator.Models.linear_classification_net import (
+    LinearClassificationNet,
+)
+from pistacchio_simulator.Models.mnist import MnistNet
+from pistacchio_simulator.Utils.phases import Phase
+from pistacchio_simulator.Utils.preferences import Preferences
 
 TDestination = TypeVar("TDestination", bound=Mapping[str, Tensor])
 
 
 class Utils:
     """Define the Utils class."""
+
+    @staticmethod
+    def get_optimizer(preferences: Preferences, model: nn.Module, phase: str):
+        if preferences.hyperparameters_config.optimizer == "adam":
+            return torch.optim.Adam(
+                model.parameters(),
+                lr=preferences.server_config.lr
+                if phase == Phase.SERVER
+                else preferences.p2p_config.lr,
+            )
+        elif preferences.hyperparameters_config.optimizer == "sgd":
+            return torch.optim.SGD(
+                model.parameters(),
+                lr=preferences.server_config.lr
+                if phase == Phase.SERVER
+                else preferences.p2p_config.lr,
+            )
+        else:
+            raise ValueError("Invalid optimizer")
+
+    @staticmethod
+    def get_model(preferences: Preferences) -> nn.Module:
+        """This function is used to get the model.
+
+        Returns
+        -------
+            nn.Module: the model
+        """
+        model = None
+        if preferences.dataset == "mnist":
+            model = MnistNet()
+        elif preferences.dataset == "celeba":
+            model = CelebaNet()
+        # elif preferences.dataset == "celeba_gender":
+        #     model = CelebaGenderNet()
+        elif preferences.dataset == "fashion_mnist":
+            model = FashionMnistNet()
+        elif preferences.dataset == "dutch":
+            model = LinearClassificationNet(input_size=11, output_size=2)
+        elif preferences.dataset == "covertype":
+            model = LinearClassificationNet(input_size=54, output_size=7)
+        elif (
+            preferences.dataset == "imaginette"
+            or preferences.dataset == "imaginette_csv"
+        ):
+            model = Utils.get_model_to_fine_tune()
+            preferences.fine_tuning = True
+        elif preferences.dataset == "income":
+            model = LinearClassificationNet(input_size=53, output_size=2)
+
+        else:
+            raise InvalidDatasetNameError("Invalid dataset name")
+        return model
+
+    def aggregate_weights(weights: list, num_examples_list: list) -> list:
+        """Compute weighted average.
+        This function is taken from
+        https://github.com/adap/flower/blob/0f725128e27fea7099726043f73cc2ce727e9fff/src/py/flwr/server/strategy/aggregate.py#L38
+        """
+
+        # Calculate the total number of examples used during training
+        num_examples_total = sum(
+            [num_examples for _, num_examples in zip(weights, num_examples_list)]
+        )
+
+        # Create a list of weights, each multiplied by the related number of examples
+        weighted_weights = [
+            [layer * num_examples for layer in weights]
+            for weights, num_examples in zip(weights, num_examples_list)
+        ]
+
+        # Compute average weights of each layer
+        weights_prime = [
+            reduce(np.add, layer_updates) / num_examples_total
+            for layer_updates in zip(*weighted_weights)
+        ]
+        return weights_prime
+
+    @staticmethod
+    def get_model_to_fine_tune() -> nn.Module:
+        """This function is used to get the model to fine tune.
+        In this case we use a pre trained EfficientNet B0 pre trained
+        on image net.
+
+        Returns
+        -------
+            nn.Module: the model to fine tune
+        """
+        model = models.efficientnet_b0(weights="IMAGENET1K_V1")
+
+        for name, param in model.named_parameters(recurse=True):
+            if not name.startswith("classifier"):
+                param.requires_grad = False
+
+        model.classifier[1] = nn.Linear(in_features=1280, out_features=10)
+
+        return model
 
     @staticmethod
     def compute_average(shared_data: dict) -> dict[Any, Any]:
@@ -51,6 +159,20 @@ class Utils:
         return results
 
     @staticmethod
+    def get_parameters(model):
+        return [val.cpu().numpy() for _, val in model.state_dict().items()]
+
+    @staticmethod
+    def set_params(model: torch.nn.ModuleList, params):
+        """Set model weights from a list of NumPy ndarrays."""
+        params_dict = zip(model.state_dict().keys(), params)
+        state_dict = OrderedDict(
+            {k: torch.Tensor(np.atleast_1d(v)) for k, v in params_dict},
+        )
+
+        model.load_state_dict(state_dict, strict=True)
+
+    @staticmethod
     def compute_distance_from_mean(shared_data: dict, average_weights: dict) -> dict:
         """This function takes as input the weights received from all the nodes and
         the average computed by the server.
@@ -72,7 +194,6 @@ class Utils:
         for node_name, models in shared_data.items():
             mean = []
             for layer_name in models:
-
                 mean.append(
                     torch.mean(
                         torch.subtract(models[layer_name], average_weights[layer_name]),
@@ -104,36 +225,34 @@ class Utils:
         -------
             str: experiment name
         """
-        if preferences.removed_node_id:
-            return f"removed_node_{str(preferences.removed_node_id)}"
 
         diff_private = (
             ""
-            if not preferences.server_config["differential_privacy_server"]
+            if not preferences.server_config.differential_privacy
             else "differentiallyprivate_"
         )
         noise_multiplier = (
             ""
-            if not preferences.hyperparameters.get("noise_multiplier", None)
-            else f"noise_multiplier_{preferences.hyperparameters['noise_multiplier']}_"
+            if not preferences.server_config.differential_privacy
+            else f"noise_multiplier_{preferences.server_config.noise_multiplier}_"
         )
         max_grad_norm = (
             ""
-            if not preferences.hyperparameters.get("max_grad_norm", None)
-            else f"max_grad_norm_{preferences.hyperparameters['max_grad_norm']}_"
+            if not preferences.hyperparameters_config.max_grad_norm
+            else f"max_grad_norm_{preferences.hyperparameters_config.max_grad_norm}_"
         )
         return (
             ""
-            + str(preferences.dataset_name)
+            + str(preferences.dataset)
             + "_"
-            + str(preferences.data_split_config["num_nodes"])
+            + str(preferences.data_split_config.num_nodes)
             + "_nodes_"
-            + str(preferences.data_split_config["num_clusters"])
+            + str(preferences.data_split_config.num_clusters)
             + "_clusters_"
             + diff_private
             + noise_multiplier
             + max_grad_norm
-            + str(preferences.experiment_name)
+            + str(preferences.wandb_config.name)
         )
 
     @staticmethod
@@ -152,25 +271,43 @@ class Utils:
         load_dotenv()
 
         wandb_entity = os.getenv("WANDB_ENTITY")
-        config_dictionary = preferences.hyperparameters
-        config_dictionary["num_nodes"] = preferences.data_split_config["num_nodes"]
-        config_dictionary["num_clusters"] = preferences.data_split_config[
-            "num_clusters"
-        ]
+        config_dictionary = {}
+        if preferences.p2p_config:
+            config_dictionary["lr_p2p"] = preferences.p2p_config.lr
+            config_dictionary["fl_rounds_P2P"] = preferences.p2p_config.fl_rounds
+
+        if preferences.server_config:
+            config_dictionary["lr_server"] = preferences.server_config.lr
+            config_dictionary["fl_round_SERVER"] = preferences.server_config.fl_rounds
 
         if preferences.p2p_config:
-            config_dictionary["step_P2P"] = preferences.p2p_config[
-                "num_communication_round_pre_training"
-            ]
+            config_dictionary["batch_size_p2p"] = preferences.p2p_config.batch_size
+        if preferences.server_config:
+            config_dictionary[
+                "batch_size_server"
+            ] = preferences.server_config.batch_size
+
+        config_dictionary[
+            "max_phisical_batch_size"
+        ] = preferences.hyperparameters_config.max_phisical_batch_size
+        config_dictionary["delta"] = preferences.hyperparameters_config.delta
+        config_dictionary[
+            "max_grad_norm"
+        ] = preferences.hyperparameters_config.max_grad_norm
+        config_dictionary["num_nodes"] = preferences.data_split_config.num_nodes
+        config_dictionary["num_clusters"] = preferences.data_split_config.num_clusters
+        config_dictionary["optimizer"] = preferences.hyperparameters_config.optimizer
+
         wandb.init(
-            project=preferences.wandb_project,
+            project=preferences.wandb_config.project_name,
             entity=wandb_entity,
             config=config_dictionary,
             group=group,
-            tags=preferences.wandb_tags,
+            tags=preferences.wandb_config.tags,
+            name=preferences.wandb_config.name,
         )
-        if wandb.run:
-            wandb.run.name = Utils.get_run_name(preferences=preferences)
+        # if wandb.run:
+        #     wandb.run.name = Utils.get_run_name(preferences=preferences)
         return wandb
 
     @staticmethod
@@ -187,10 +324,7 @@ class Utils:
             wandb_run.log_artifact(artifact)
 
     @staticmethod
-    def log_metrics_to_wandb(
-        wandb_run: ModuleType,
-        metrics: dict
-    ) -> None:
+    def log_metrics_to_wandb(wandb_run: ModuleType, metrics: dict) -> None:
         """Log metrics to wandb.
 
         Args:
@@ -325,5 +459,7 @@ class Utils:
             raise ValueError("The two lists must not be empty")
 
         zipped_list = list(zip(first_list, second_list))
+        random.shuffle(zipped_list)
+        return zip(*zipped_list)
         random.shuffle(zipped_list)
         return zip(*zipped_list)

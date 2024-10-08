@@ -1,0 +1,30 @@
+program: run_test.py
+method: bayes
+metric:
+  name: Custom_Metric
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 5
+parameters:
+  optimizer:
+    values: ["adam", "sgd"]
+  lr_p2p:
+    min: 0.0001
+    max: 0.1
+  batch_size_p2p:
+    min: 32
+    max: 256
+  local_training_epochs_p2p:
+    min: 1
+    max: 4
+    
+command:
+  - ${env}
+  - poetry 
+  - run 
+  - python
+  - ${program}
+  - --config 
+  - only_p2p_0.2.json
+  - ${args}
